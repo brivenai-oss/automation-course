@@ -46,9 +46,10 @@ const LESSONS = [
   { id: 3, title: "n8n vs. Make.com", subtitle: "Which tool, and when" },
   { id: 4, title: "Triggers", subtitle: "Webhook vs. polling" },
   { id: 5, title: "The Five Patterns", subtitle: "The backbone of every job" },
-  { id: 6, title: "Build & Test Discipline", subtitle: "The actual craft" },
-  { id: 7, title: "Error Handling", subtitle: "Fallbacks & duplicate risk" },
-  { id: 8, title: "Documentation", subtitle: "Delivering to a real client" },
+  { id: 6, title: "Sketch Practice", subtitle: "Draw the shape before you build it" },
+  { id: 7, title: "Build & Test Discipline", subtitle: "The actual craft" },
+  { id: 8, title: "Error Handling", subtitle: "Fallbacks & duplicate risk" },
+  { id: 9, title: "Documentation", subtitle: "Delivering to a real client" },
 ];
 
 const GLOSSARY = [
@@ -170,7 +171,40 @@ const LESSON3_MC = {
   explain: "Zero infrastructure to manage means fewer things that can go wrong while you're still building confidence — you add n8n once you're ready for clients who specifically need it.",
 };
 
+// Sketch practice exercises — the learner builds a trigger/action/condition shape, we check its structure
+const SKETCH_EXERCISES = [
+  {
+    id: "ex1",
+    scenario:
+      "A new Typeform response should be added as a row in Airtable, and the client should get a Slack notification.",
+    expected: { actions: 2, condition: false },
+    successNote: "That's a lead capture & notification pattern — trigger, then two actions in a row.",
+  },
+  {
+    id: "ex2",
+    scenario:
+      "Every Monday morning, pull last week's sales totals from the POS system, compile them into a report, and email it to the owner.",
+    expected: { actions: 3, condition: false },
+    successNote: "Scheduled data sync / reporting — a timer trigger feeding a short chain of actions.",
+  },
+  {
+    id: "ex3",
+    scenario:
+      "New leads come in through a form. If the deal value is over $1,000, notify the sales manager directly — otherwise, add it to the standard follow-up queue.",
+    expected: { actions: 0, condition: true, pathAMin: 1, pathBMin: 1 },
+    successNote: "Conditional routing — the trigger feeds straight into a Condition that splits the outcome.",
+  },
+];
+
+let __idCounter = 0;
+function nextId() {
+  __idCounter += 1;
+  return `box-${__idCounter}`;
+}
+
 // Lesson 4 quiz data
+
+
 const LESSON4_PAIRS = [
   { term: "OAuth", def: "A secure 'Sign in with Google/Slack/etc.' popup — the client authorizes access without ever sharing a password." },
   { term: "API key", def: "A private access code generated inside an app's own settings, used to authorize a workflow to act on its behalf." },
@@ -673,6 +707,307 @@ function MixedQuiz({ matchPairs, matchLabel, questions, savedScore, onComplete, 
           {score} / {TOTAL} correct
         </div>
       )}
+    </div>
+  );
+}
+
+
+function FlowBox({ label, kind, onRemove }) {
+  const colors = {
+    trigger: T.wire,
+    action: T.copper,
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "9px 14px",
+        borderRadius: 7,
+        border: `1.5px solid ${colors[kind]}`,
+        background: "#fff",
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontFamily: FONTS.mono, fontSize: 12.5, color: colors[kind] }}>{label}</span>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          aria-label={`Remove ${label}`}
+          style={{ border: "none", background: "transparent", cursor: "pointer", color: T.inkSoft, padding: 0, display: "flex" }}
+        >
+          <X size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GhostButton({ children, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "9px 14px",
+        borderRadius: 7,
+        border: `1.5px dashed ${disabled ? T.parchmentDim : T.inkSoft}`,
+        background: "transparent",
+        color: disabled ? "#B9B29A" : T.inkSoft,
+        fontFamily: FONTS.mono,
+        fontSize: 12,
+        cursor: disabled ? "not-allowed" : "pointer",
+        flexShrink: 0,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Arrow() {
+  return (
+    <span style={{ color: T.inkSoft, fontSize: 16, flexShrink: 0, padding: "0 2px" }} aria-hidden>
+      →
+    </span>
+  );
+}
+
+function ConditionDiamond({ onRemove }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+      <div
+        style={{
+          width: 58,
+          height: 58,
+          transform: "rotate(45deg)",
+          border: `2px solid ${T.signal}`,
+          background: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+        }}
+      >
+        <span
+          style={{
+            transform: "rotate(-45deg)",
+            fontFamily: FONTS.mono,
+            fontSize: 10.5,
+            color: T.signal,
+            fontWeight: 600,
+          }}
+        >
+          IF
+        </span>
+      </div>
+      <button
+        onClick={onRemove}
+        style={{
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          color: T.inkSoft,
+          fontFamily: FONTS.mono,
+          fontSize: 10.5,
+          marginTop: 2,
+          textDecoration: "underline",
+        }}
+      >
+        remove
+      </button>
+    </div>
+  );
+}
+
+function Lane({ label, boxes, onAdd, onRemove }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: T.inkSoft, letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>
+        {label}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {boxes.map((b, i) => (
+          <React.Fragment key={b}>
+            {i > 0 && <Arrow />}
+            <FlowBox label="Action" kind="action" onRemove={() => onRemove(b)} />
+          </React.Fragment>
+        ))}
+        {boxes.length > 0 && <Arrow />}
+        <GhostButton onClick={onAdd}>+ Action</GhostButton>
+      </div>
+    </div>
+  );
+}
+
+function FlowExercise({ exercise, solved, onSolved }) {
+  const [trigger, setTrigger] = useState(false);
+  const [mainActions, setMainActions] = useState([]);
+  const [condition, setCondition] = useState(false);
+  const [pathA, setPathA] = useState([]);
+  const [pathB, setPathB] = useState([]);
+  const [feedback, setFeedback] = useState(null); // { correct: bool, message: string }
+
+  const addMainAction = () => setMainActions((a) => [...a, nextId()]);
+  const removeMainAction = (id) => setMainActions((a) => a.filter((x) => x !== id));
+  const addPathA = () => setPathA((a) => [...a, nextId()]);
+  const removePathA = (id) => setPathA((a) => a.filter((x) => x !== id));
+  const addPathB = () => setPathB((a) => [...a, nextId()]);
+  const removePathB = (id) => setPathB((a) => a.filter((x) => x !== id));
+
+  const reset = () => {
+    setTrigger(false);
+    setMainActions([]);
+    setCondition(false);
+    setPathA([]);
+    setPathB([]);
+    setFeedback(null);
+  };
+
+  const check = () => {
+    const exp = exercise.expected;
+    let correct = false;
+    let message = "";
+
+    if (!trigger) {
+      message = "Every workflow needs to start with a Trigger — add one first.";
+    } else if (exp.condition && !condition) {
+      message = "This scenario has two different outcomes depending on a condition — try adding a Condition box.";
+    } else if (!exp.condition && condition) {
+      message = "This scenario doesn't branch — everything happens the same way every time, so you don't need a Condition box here.";
+    } else if (exp.condition && condition && (pathA.length < exp.pathAMin || pathB.length < exp.pathBMin)) {
+      message = "Each path coming out of your Condition needs at least one Action.";
+    } else if (!exp.condition && mainActions.length < exp.actions) {
+      message = "You're missing at least one action step — reread the scenario for every downstream step.";
+    } else if (!exp.condition && mainActions.length > exp.actions) {
+      message = "You've added more actions than this scenario describes — try to match it exactly.";
+    } else {
+      correct = true;
+      message = exercise.successNote;
+    }
+
+    setFeedback({ correct, message });
+    if (correct) onSolved();
+  };
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: T.ink, lineHeight: 1.6, margin: 0 }}>{exercise.scenario}</p>
+        {solved && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0, color: T.signal }}>
+            <CheckCircle2 size={16} />
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11 }}>Solved</span>
+          </div>
+        )}
+      </div>
+
+      {/* Canvas */}
+      <div
+        style={{
+          background: T.parchment,
+          border: `1px dashed ${T.parchmentDim}`,
+          borderRadius: 8,
+          padding: 18,
+          marginBottom: 14,
+          minWidth: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
+          {trigger ? (
+            <FlowBox label="Trigger" kind="trigger" onRemove={() => setTrigger(false)} />
+          ) : (
+            <GhostButton onClick={() => setTrigger(true)}>+ Trigger</GhostButton>
+          )}
+
+          {trigger &&
+            mainActions.map((id, i) => (
+              <React.Fragment key={id}>
+                <Arrow />
+                <FlowBox label="Action" kind="action" onRemove={() => removeMainAction(id)} />
+              </React.Fragment>
+            ))}
+
+          {trigger && !condition && (
+            <>
+              <Arrow />
+              <GhostButton onClick={addMainAction}>+ Action</GhostButton>
+              <Arrow />
+              <GhostButton onClick={() => setCondition(true)}>+ Condition</GhostButton>
+            </>
+          )}
+
+          {trigger && condition && (
+            <>
+              <Arrow />
+              <ConditionDiamond onRemove={() => { setCondition(false); setPathA([]); setPathB([]); }} />
+            </>
+          )}
+        </div>
+
+        {trigger && condition && (
+          <div style={{ display: "flex", gap: 24, marginTop: 18, paddingTop: 16, borderTop: `1px solid ${T.parchmentDim}` }}>
+            <Lane label="Path A · If true" boxes={pathA} onAdd={addPathA} onRemove={removePathA} />
+            <Lane label="Path B · If false" boxes={pathB} onAdd={addPathB} onRemove={removePathB} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <button
+          onClick={check}
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            padding: "9px 18px",
+            borderRadius: 7,
+            border: "none",
+            background: T.copper,
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Check my diagram
+        </button>
+        <button
+          onClick={reset}
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            padding: "9px 16px",
+            borderRadius: 7,
+            border: `1px solid ${T.parchmentDim}`,
+            background: "transparent",
+            color: T.inkSoft,
+            cursor: "pointer",
+          }}
+        >
+          Reset
+        </button>
+        {feedback && (
+          <div
+            style={{
+              fontFamily: FONTS.body,
+              fontSize: 14,
+              color: feedback.correct ? T.signal : "#B5523F",
+              flex: "1 1 260px",
+              minWidth: 0,
+            }}
+          >
+            {feedback.correct ? "✓ " : ""}
+            {feedback.message}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1196,6 +1531,77 @@ function Lesson5({ savedScore, onQuizComplete }) {
   );
 }
 
+function Lesson6({ savedScore, onQuizComplete }) {
+  const [solvedIds, setSolvedIds] = useState(() => new Set());
+  const reported = React.useRef(false);
+
+  const markSolved = (id) => {
+    setSolvedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (solvedIds.size === SKETCH_EXERCISES.length && !reported.current) {
+      reported.current = true;
+      onQuizComplete(solvedIds.size);
+    }
+  }, [solvedIds]);
+
+  const doneCount = savedScore !== undefined ? SKETCH_EXERCISES.length : solvedIds.size;
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 6 — SKETCH PRACTICE
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        Draw the shape before you build it
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>
+        Interactive practice · {doneCount} / {SKETCH_EXERCISES.length} solved
+      </div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Before you ever open Make.com or n8n, you should be able to sketch the shape of a workflow just
+          from how a client describes it in plain language. This is that muscle, in isolation — no real tool,
+          nothing to break, just the trigger → action → condition mental model.
+        </p>
+      </div>
+
+      <p style={{ fontFamily: FONTS.body, fontSize: 16, color: T.ink, lineHeight: 1.7, marginBottom: 26 }}>
+        For each scenario below, build the matching diagram: add a <strong>Trigger</strong> to start, then{" "}
+        <strong>Action</strong> boxes for each downstream step. If the scenario branches into two different
+        outcomes, add a <strong>Condition</strong> instead of another action, and build out both paths.
+      </p>
+
+      {SKETCH_EXERCISES.map((ex, i) => (
+        <div key={ex.id} style={{ marginBottom: 4 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, marginBottom: 8, letterSpacing: 0.4 }}>
+            EXERCISE {i + 1} OF {SKETCH_EXERCISES.length}
+          </div>
+          <FlowExercise exercise={ex} solved={savedScore !== undefined || solvedIds.has(ex.id)} onSolved={() => markSolved(ex.id)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---------- App shell ----------
 export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1346,6 +1752,12 @@ export default function App() {
           <Lesson5
             savedScore={completed[5]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 5: score }))}
+          />
+        )}
+        {activeLesson === 6 && (
+          <Lesson6
+            savedScore={completed[6]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 6: score }))}
           />
         )}
       </div>
