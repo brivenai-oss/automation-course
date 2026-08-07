@@ -483,6 +483,7 @@ function MatchQuestion({ pairs, submitted, selections, onSelect }) {
                 borderRadius: 7,
                 padding: "10px 14px",
                 background: submitted ? (isCorrect ? "rgba(76,175,109,0.06)" : "rgba(209,85,74,0.05)") : "transparent",
+                minWidth: 0,
               }}
             >
               <div
@@ -504,7 +505,11 @@ function MatchQuestion({ pairs, submitted, selections, onSelect }) {
                 value={selected || ""}
                 onChange={(e) => onSelect(i, e.target.value)}
                 style={{
-                  flex: 1,
+                  flex: "1 1 0%",
+                  minWidth: 0,
+                  width: "100%",
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
                   fontFamily: FONTS.body,
                   fontSize: 14,
                   color: T.ink,
