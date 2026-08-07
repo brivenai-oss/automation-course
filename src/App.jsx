@@ -140,6 +140,36 @@ const LESSON2_MC = {
   explain: "This exact vocabulary is how you'll describe plans to clients and how you'll prompt Claude/ChatGPT to help you build — it's working language, not trivia.",
 };
 
+// Lesson 3 quiz data
+const LESSON3_PAIRS = [
+  { term: "n8n", def: "Free if self-hosted with unlimited executions, and has a code node for custom logic." },
+  { term: "Make.com", def: "Generous free tier with no hosting needed, and a polished scenario-based UI." },
+];
+
+const LESSON3_SCENARIO = {
+  q: "A client says they want to eventually self-host their automation on their own server and need some custom JavaScript logic. Which tool fits that request better?",
+  options: [
+    "Make.com, because it has the more polished interface",
+    "n8n, because it's open-source, self-hostable, and has a code node for custom logic",
+    "Neither tool supports custom logic",
+    "It doesn't matter — pick whichever you personally prefer",
+  ],
+  correct: 1,
+  explain: "Self-hosting and custom code are exactly n8n's strengths. Make.com is the faster starting point, but this specific ask points to n8n.",
+};
+
+const LESSON3_MC = {
+  q: "Why does the guide recommend starting on Make.com first, even though n8n is more flexible long-term?",
+  options: [
+    "Make.com is objectively a better product in every way",
+    "Its free tier needs no hosting or server setup, so you can build and deliver real client work with zero infrastructure to manage",
+    "n8n doesn't have a free tier at all",
+    "Clients always prefer Make.com by default",
+  ],
+  correct: 1,
+  explain: "Zero infrastructure to manage means fewer things that can go wrong while you're still building confidence — you add n8n once you're ready for clients who specifically need it.",
+};
+
 // ---------- Small UI pieces ----------
 function LessonBadge({ n, state }) {
   const bg = state === "current" ? T.copper : state === "done" ? T.signal : "transparent";
@@ -307,145 +337,6 @@ function GlossaryDrawer({ open, onClose }) {
   );
 }
 
-function Quiz({ savedScore, onComplete }) {
-  const [answers, setAnswers] = useState(Array(QUIZ.length).fill(null));
-  const [submitted, setSubmitted] = useState(savedScore !== undefined);
-
-  const allAnswered = answers.every((a) => a !== null);
-  const score = submitted && savedScore !== undefined ? savedScore : answers.filter((a, i) => a === QUIZ[i].correct).length;
-
-  const handleSubmit = () => {
-    const s = answers.filter((a, i) => a === QUIZ[i].correct).length;
-    setSubmitted(true);
-    onComplete?.(s);
-  };
-
-  return (
-    <div
-      style={{
-        background: "#fff",
-        border: `1px solid ${T.parchmentDim}`,
-        borderRadius: 10,
-        padding: "26px 28px",
-        marginTop: 36,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-        <Radio size={16} color={T.wire} />
-        <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: 0.8, color: T.wire, textTransform: "uppercase" }}>
-          Check your understanding
-        </span>
-      </div>
-      <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.inkSoft, marginTop: 6, marginBottom: 22 }}>
-        Three quick questions before you move on. No pressure — you can retry.
-      </p>
-
-      {QUIZ.map((item, qi) => (
-        <div key={qi} style={{ marginBottom: 24 }}>
-          <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 15.5, color: T.ink, marginBottom: 10 }}>
-            {qi + 1}. {item.q}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {item.options.map((opt, oi) => {
-              const isSelected = answers[qi] === oi;
-              const isCorrect = oi === item.correct;
-              let borderColor = T.parchmentDim;
-              let bg = "transparent";
-              if (submitted) {
-                if (isCorrect) {
-                  borderColor = T.signal;
-                  bg = "rgba(76,175,109,0.08)";
-                } else if (isSelected && !isCorrect) {
-                  borderColor = "#D1554A";
-                  bg = "rgba(209,85,74,0.06)";
-                }
-              } else if (isSelected) {
-                borderColor = T.wire;
-                bg = "rgba(76,139,245,0.06)";
-              }
-              return (
-                <button
-                  key={oi}
-                  disabled={submitted}
-                  onClick={() => {
-                    const next = [...answers];
-                    next[qi] = oi;
-                    setAnswers(next);
-                  }}
-                  style={{
-                    textAlign: "left",
-                    fontFamily: FONTS.body,
-                    fontSize: 14.5,
-                    color: T.ink,
-                    padding: "10px 14px",
-                    borderRadius: 7,
-                    border: `1.5px solid ${borderColor}`,
-                    background: bg,
-                    cursor: submitted ? "default" : "pointer",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-          {submitted && (
-            <div
-              style={{
-                marginTop: 10,
-                fontFamily: FONTS.body,
-                fontSize: 13.5,
-                color: T.inkSoft,
-                borderLeft: `2.5px solid ${answers[qi] === item.correct ? T.signal : "#D1554A"}`,
-                paddingLeft: 12,
-              }}
-            >
-              {item.explain}
-            </div>
-          )}
-        </div>
-      ))}
-
-      {!submitted ? (
-        <button
-          disabled={!allAnswered}
-          onClick={handleSubmit}
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: 12.5,
-            letterSpacing: 0.5,
-            textTransform: "uppercase",
-            padding: "11px 22px",
-            borderRadius: 7,
-            border: "none",
-            background: allAnswered ? T.copper : "#D8D2BE",
-            color: "#fff",
-            cursor: allAnswered ? "pointer" : "not-allowed",
-          }}
-        >
-          Submit answers
-        </button>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            fontFamily: FONTS.display,
-            fontWeight: 600,
-            fontSize: 15,
-            color: score === QUIZ.length ? T.signal : T.copper,
-          }}
-        >
-          <CheckCircle2 size={18} />
-          {score} / {QUIZ.length} correct
-        </div>
-      )}
-    </div>
-  );
-}
-
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -455,13 +346,13 @@ function shuffle(arr) {
   return a;
 }
 
-function MatchQuestion({ pairs, submitted, selections, onSelect }) {
+function MatchQuestion({ index = 1, label = "Match each term to its definition", pairs, submitted, selections, onSelect }) {
   const [shuffledDefs] = useState(() => shuffle(pairs.map((p) => p.def)));
 
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 15.5, color: T.ink, marginBottom: 4 }}>
-        1. Match each term to its definition
+        {index}. {label}
       </div>
       <p style={{ fontFamily: FONTS.body, fontSize: 13.5, color: T.inkSoft, marginTop: 0, marginBottom: 14 }}>
         Pick the correct definition for each term from the dropdown.
@@ -538,7 +429,7 @@ function MatchQuestion({ pairs, submitted, selections, onSelect }) {
 
 function ChoiceQuestion({ index, item, submitted, selected, onSelect }) {
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div style={{ marginBottom: 24, minWidth: 0 }}>
       <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 15.5, color: T.ink, marginBottom: 10 }}>
         {index}. {item.q}
       </div>
@@ -576,6 +467,8 @@ function ChoiceQuestion({ index, item, submitted, selected, onSelect }) {
                 background: bg,
                 cursor: submitted ? "default" : "pointer",
                 lineHeight: 1.4,
+                width: "100%",
+                boxSizing: "border-box",
               }}
             >
               {opt}
@@ -601,20 +494,26 @@ function ChoiceQuestion({ index, item, submitted, selected, onSelect }) {
   );
 }
 
-function Quiz2({ savedScore, onComplete }) {
-  const TOTAL = MATCH_PAIRS.length + 2; // 3 match pairs + scenario + mc
-  const [matchSel, setMatchSel] = useState(Array(MATCH_PAIRS.length).fill(null));
-  const [scenarioSel, setScenarioSel] = useState(null);
-  const [mcSel, setMcSel] = useState(null);
+/**
+ * Generic reusable quiz block for every lesson.
+ * - matchPairs (optional): array of {term, def} rendered as one match-the-term question
+ * - questions: array of {q, options, correct, explain} rendered as multiple choice / scenario questions
+ * Every lesson quiz — MC, scenario, or match — is built from this single component so fixes
+ * (like the dropdown overflow) only need to happen in one place.
+ */
+function MixedQuiz({ matchPairs, matchLabel, questions, savedScore, onComplete, intro }) {
+  const TOTAL = (matchPairs ? matchPairs.length : 0) + questions.length;
+  const [matchSel, setMatchSel] = useState(matchPairs ? Array(matchPairs.length).fill(null) : []);
+  const [choiceSel, setChoiceSel] = useState(Array(questions.length).fill(null));
   const [submitted, setSubmitted] = useState(savedScore !== undefined);
 
-  const allAnswered = matchSel.every((s) => s !== null) && scenarioSel !== null && mcSel !== null;
+  const allAnswered =
+    (!matchPairs || matchSel.every((s) => s !== null)) && choiceSel.every((s) => s !== null);
 
   const computeScore = () => {
-    const matchCorrect = matchSel.filter((s, i) => s === MATCH_PAIRS[i].def).length;
-    const scenarioCorrect = scenarioSel === LESSON2_SCENARIO.correct ? 1 : 0;
-    const mcCorrect = mcSel === LESSON2_MC.correct ? 1 : 0;
-    return matchCorrect + scenarioCorrect + mcCorrect;
+    const matchCorrect = matchPairs ? matchSel.filter((s, i) => s === matchPairs[i].def).length : 0;
+    const choiceCorrect = choiceSel.filter((s, i) => s === questions[i].correct).length;
+    return matchCorrect + choiceCorrect;
   };
 
   const score = submitted && savedScore !== undefined ? savedScore : computeScore();
@@ -625,6 +524,8 @@ function Quiz2({ savedScore, onComplete }) {
     onComplete?.(s);
   };
 
+  const choiceStartIndex = matchPairs ? 2 : 1;
+
   return (
     <div
       style={{
@@ -633,6 +534,7 @@ function Quiz2({ savedScore, onComplete }) {
         borderRadius: 10,
         padding: "26px 28px",
         marginTop: 36,
+        minWidth: 0,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -642,27 +544,38 @@ function Quiz2({ savedScore, onComplete }) {
         </span>
       </div>
       <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.inkSoft, marginTop: 6, marginBottom: 22 }}>
-        A mix of formats this time — matching, a real scenario call, and a quick check.
+        {intro || "A few quick questions before you move on. No pressure — you can retry."}
       </p>
 
-      <MatchQuestion
-        pairs={MATCH_PAIRS}
-        submitted={submitted}
-        selections={matchSel}
-        onSelect={(i, val) => {
-          const next = [...matchSel];
-          next[i] = val;
-          setMatchSel(next);
-        }}
-      />
-      <ChoiceQuestion
-        index={2}
-        item={LESSON2_SCENARIO}
-        submitted={submitted}
-        selected={scenarioSel}
-        onSelect={setScenarioSel}
-      />
-      <ChoiceQuestion index={3} item={LESSON2_MC} submitted={submitted} selected={mcSel} onSelect={setMcSel} />
+      {matchPairs && (
+        <MatchQuestion
+          index={1}
+          label={matchLabel}
+          pairs={matchPairs}
+          submitted={submitted}
+          selections={matchSel}
+          onSelect={(i, val) => {
+            const next = [...matchSel];
+            next[i] = val;
+            setMatchSel(next);
+          }}
+        />
+      )}
+
+      {questions.map((item, qi) => (
+        <ChoiceQuestion
+          key={qi}
+          index={choiceStartIndex + qi}
+          item={item}
+          submitted={submitted}
+          selected={choiceSel[qi]}
+          onSelect={(oi) => {
+            const next = [...choiceSel];
+            next[qi] = oi;
+            setChoiceSel(next);
+          }}
+        />
+      ))}
 
       {!submitted ? (
         <button
@@ -702,6 +615,7 @@ function Quiz2({ savedScore, onComplete }) {
     </div>
   );
 }
+
 
 // ---------- Lesson 1 content ----------
 function Lesson1({ savedScore, onQuizComplete }) {
@@ -782,7 +696,12 @@ function Lesson1({ savedScore, onQuizComplete }) {
         error handling — is just giving that translation instinct more tools to work with.
       </p>
 
-      <Quiz savedScore={savedScore} onComplete={onQuizComplete} />
+      <MixedQuiz
+        questions={QUIZ}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="Three quick questions before you move on. No pressure — you can retry."
+      />
     </div>
   );
 }
@@ -872,7 +791,122 @@ function Lesson2({ savedScore, onQuizComplete }) {
         you work.
       </p>
 
-      <Quiz2 savedScore={savedScore} onComplete={onQuizComplete} />
+      <MixedQuiz
+        matchPairs={MATCH_PAIRS}
+        questions={[LESSON2_SCENARIO, LESSON2_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A mix of formats this time — matching, a real scenario call, and a quick check."
+      />
+    </div>
+  );
+}
+
+function CompareRow({ label, n8n, make, first }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "120px 1fr 1fr",
+        gap: 12,
+        padding: "12px 0",
+        borderTop: first ? "none" : `1px solid ${T.parchmentDim}`,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: 0.4 }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, lineHeight: 1.5 }}>{n8n}</div>
+      <div style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, lineHeight: 1.5 }}>{make}</div>
+    </div>
+  );
+}
+
+function Lesson3({ savedScore, onQuizComplete }) {
+  return (
+    <div style={{ maxWidth: 660 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 3 — N8N VS. MAKE.COM
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        Which tool, and when
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~6 min read</div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Picking the right tool for each job is itself a piece of expertise you're delivering — a confident,
+          reasoned recommendation ("here's why Make.com fits your case") lands very differently than "I only
+          know one tool."
+        </p>
+      </div>
+
+      <div style={{ marginBottom: 8, minWidth: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 1fr", gap: 12, marginBottom: 4 }}>
+          <div />
+          <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 14, color: T.copper }}>n8n</div>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 14, color: T.copper }}>Make.com</div>
+        </div>
+        <CompareRow first label="Interface" n8n="Node-based visual canvas, open-source" make="Scenario-based visual canvas, polished UI" />
+        <CompareRow
+          label="Cost model"
+          n8n="Free if self-hosted (unlimited executions); paid cloud plans if hosted by n8n"
+          make="Generous free tier (a monthly operations allowance) with no hosting needed"
+        />
+        <CompareRow
+          label="Best for a beginner"
+          n8n="More flexible/powerful once you're comfortable; useful when a client wants to own their own server"
+          make="Faster to start with zero setup — build directly inside the client's own free account"
+        />
+        <CompareRow
+          label="Custom logic"
+          n8n="Has a code node (JavaScript/Python) for anything the visual nodes can't do"
+          make="Has its own function/formula tools, slightly more limited than a full code node"
+        />
+      </div>
+
+      <div
+        style={{
+          background: T.parchmentDim,
+          borderRadius: 8,
+          padding: "18px 20px",
+          margin: "28px 0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <BookOpen size={16} color={T.copper} />
+          <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: 0.6, color: T.copper, textTransform: "uppercase" }}>
+            Practical recommendation
+          </span>
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 16, color: T.ink, margin: 0, lineHeight: 1.65 }}>
+          Start learning on Make.com first — its free tier needs no hosting or server setup, so you can build
+          and deliver real client work with zero infrastructure to manage. Learn n8n as your second tool once
+          you're comfortable, for clients who specifically want to self-host or need more complex custom
+          logic.
+        </p>
+      </div>
+
+      <MixedQuiz
+        matchPairs={LESSON3_PAIRS}
+        matchLabel="Match each tool to its defining strength"
+        questions={[LESSON3_SCENARIO, LESSON3_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A scenario call and a quick check, plus one match-up."
+      />
     </div>
   );
 }
@@ -998,7 +1032,7 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <div style={{ flex: 1, background: T.parchment, padding: "48px 56px", overflowY: "auto" }}>
+      <div style={{ flex: 1, minWidth: 0, background: T.parchment, padding: "48px 56px", overflowY: "auto", overflowX: "hidden" }}>
         {activeLesson === 1 && (
           <Lesson1
             savedScore={completed[1]}
@@ -1009,6 +1043,12 @@ export default function App() {
           <Lesson2
             savedScore={completed[2]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 2: score }))}
+          />
+        )}
+        {activeLesson === 3 && (
+          <Lesson3
+            savedScore={completed[3]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 3: score }))}
           />
         )}
       </div>
