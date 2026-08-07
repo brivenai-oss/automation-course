@@ -171,28 +171,57 @@ const LESSON3_MC = {
   explain: "Zero infrastructure to manage means fewer things that can go wrong while you're still building confidence — you add n8n once you're ready for clients who specifically need it.",
 };
 
-// Sketch practice exercises — the learner builds a trigger/action/condition shape, we check its structure
+// Sketch practice exercises — the learner builds a trigger/action/condition shape, we check its structure.
+// expected: { preActions: exact # of actions before any condition, condition: bool,
+//             pathA/pathB: exact # of actions on each branch (only used when condition is true) }
 const SKETCH_EXERCISES = [
   {
     id: "ex1",
+    level: "Foundational",
     scenario:
       "A new Typeform response should be added as a row in Airtable, and the client should get a Slack notification.",
-    expected: { actions: 2, condition: false },
+    expected: { preActions: 2, condition: false },
     successNote: "That's a lead capture & notification pattern — trigger, then two actions in a row.",
   },
   {
     id: "ex2",
+    level: "Foundational",
     scenario:
       "Every Monday morning, pull last week's sales totals from the POS system, compile them into a report, and email it to the owner.",
-    expected: { actions: 3, condition: false },
+    expected: { preActions: 3, condition: false },
     successNote: "Scheduled data sync / reporting — a timer trigger feeding a short chain of actions.",
   },
   {
     id: "ex3",
+    level: "Foundational",
     scenario:
       "New leads come in through a form. If the deal value is over $1,000, notify the sales manager directly — otherwise, add it to the standard follow-up queue.",
-    expected: { actions: 0, condition: true, pathAMin: 1, pathBMin: 1 },
+    expected: { preActions: 0, condition: true, pathA: 1, pathB: 1 },
     successNote: "Conditional routing — the trigger feeds straight into a Condition that splits the outcome.",
+  },
+  {
+    id: "ex4",
+    level: "Advanced",
+    scenario:
+      "A new client order should generate an invoice, notify the fulfillment team in Slack, create a calendar event for the delivery date, and update the master order-tracking sheet.",
+    expected: { preActions: 4, condition: false },
+    successNote: "A multi-step chain — several downstream actions fired in sequence from one trigger, no branching needed.",
+  },
+  {
+    id: "ex5",
+    level: "Advanced",
+    scenario:
+      "A new support ticket comes in. First, log it in the tracking sheet. Then: if it's marked urgent, ping the on-call engineer immediately and create a high-priority calendar block. If it's not urgent, just add it to the weekly triage queue.",
+    expected: { preActions: 1, condition: true, pathA: 2, pathB: 1 },
+    successNote: "The branch doesn't have to start right at the trigger — a shared step (logging the ticket) can happen first, and the paths themselves don't need to be the same length.",
+  },
+  {
+    id: "ex6",
+    level: "Advanced",
+    scenario:
+      "A new job application comes in. Log it in the applicant tracker. If the candidate meets the minimum experience requirement, notify the hiring manager and schedule a screening call. If they don't meet it, send an automated rejection email and add them to a future-candidates list.",
+    expected: { preActions: 1, condition: true, pathA: 2, pathB: 2 },
+    successNote: "Both branches carry real weight here — this is the shape of most rejection/approval workflows you'll build for clients.",
   },
 ];
 
@@ -263,6 +292,37 @@ const LESSON5_MC = {
   ],
   correct: 2,
   explain: "A decision point based on a condition (deal value) is exactly conditional routing — very often combined with lead capture, as it is here.",
+};
+
+// Lesson 7 quiz data
+const LESSON7_PAIRS = [
+  { term: "4.1 — Map it out", def: "Write out the trigger, every action in order, and any conditions in plain language before opening any tool." },
+  { term: "4.2 — Data mapping", def: "Passing a specific field's value from an earlier step into the current action." },
+  { term: "4.3 — Build & test", def: "Add one step, test it, confirm the data looks right, then add the next — never test only at the very end." },
+];
+
+const LESSON7_SCENARIO = {
+  q: "You've mapped out a client's job on paper: trigger → three actions → one conditional branch. What's the correct build order inside the tool?",
+  options: [
+    "Build all four steps first, then run one test at the very end",
+    "Build and test the trigger alone first, then add and test each action one at a time, then add the conditional logic last",
+    "Build the conditional branch first since it's the trickiest part",
+    "Build the actions first, then add the trigger last",
+  ],
+  correct: 1,
+  explain: "Test-as-you-go means you always know exactly which step introduced a problem, instead of debugging a whole chain at once.",
+};
+
+const LESSON7_MC = {
+  q: "What's the main risk of building all the steps blind and only testing the full chain at the end?",
+  options: [
+    "It takes exactly the same amount of time either way, so there's no real risk",
+    "When something breaks, you won't know which of the steps actually caused it",
+    "The client will be able to tell which order you built things in",
+    "Make.com and n8n don't allow testing individual steps at all",
+  ],
+  correct: 1,
+  explain: "This is the single most common beginner mistake the guide calls out — it turns a 5-minute fix into a much longer hunt through every step.",
 };
 
 // ---------- Small UI pieces ----------
@@ -880,12 +940,27 @@ function FlowExercise({ exercise, solved, onSolved }) {
       message = "This scenario has two different outcomes depending on a condition — try adding a Condition box.";
     } else if (!exp.condition && condition) {
       message = "This scenario doesn't branch — everything happens the same way every time, so you don't need a Condition box here.";
-    } else if (exp.condition && condition && (pathA.length < exp.pathAMin || pathB.length < exp.pathBMin)) {
-      message = "Each path coming out of your Condition needs at least one Action.";
-    } else if (!exp.condition && mainActions.length < exp.actions) {
-      message = "You're missing at least one action step — reread the scenario for every downstream step.";
-    } else if (!exp.condition && mainActions.length > exp.actions) {
-      message = "You've added more actions than this scenario describes — try to match it exactly.";
+    } else if (mainActions.length !== exp.preActions) {
+      const tooFew = mainActions.length < exp.preActions;
+      if (exp.condition) {
+        message = tooFew
+          ? "You're missing a step that happens before the branch — reread the scenario for anything that happens either way."
+          : "You've added a step before the branch that this scenario doesn't describe — only include what happens regardless of the condition.";
+      } else {
+        message = tooFew
+          ? "You're missing at least one action step — reread the scenario for every downstream step."
+          : "You've added more actions than this scenario describes — try to match it exactly.";
+      }
+    } else if (exp.condition && pathA.length !== exp.pathA) {
+      message =
+        pathA.length < exp.pathA
+          ? "Path A is missing at least one action described in that branch of the scenario."
+          : "Path A has more actions than that branch of the scenario describes.";
+    } else if (exp.condition && pathB.length !== exp.pathB) {
+      message =
+        pathB.length < exp.pathB
+          ? "Path B is missing at least one action described in that branch of the scenario."
+          : "Path B has more actions than that branch of the scenario describes.";
     } else {
       correct = true;
       message = exercise.successNote;
@@ -899,12 +974,14 @@ function FlowExercise({ exercise, solved, onSolved }) {
     <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
         <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: T.ink, lineHeight: 1.6, margin: 0 }}>{exercise.scenario}</p>
-        {solved && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0, color: T.signal }}>
-            <CheckCircle2 size={16} />
-            <span style={{ fontFamily: FONTS.mono, fontSize: 11 }}>Solved</span>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {solved && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, color: T.signal }}>
+              <CheckCircle2 size={16} />
+              <span style={{ fontFamily: FONTS.mono, fontSize: 11 }}>Solved</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Canvas */}
@@ -1592,12 +1669,125 @@ function Lesson6({ savedScore, onQuizComplete }) {
 
       {SKETCH_EXERCISES.map((ex, i) => (
         <div key={ex.id} style={{ marginBottom: 4 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, marginBottom: 8, letterSpacing: 0.4 }}>
-            EXERCISE {i + 1} OF {SKETCH_EXERCISES.length}
+          {i === 3 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "8px 0 22px 0" }}>
+              <div style={{ flex: 1, height: 1, background: T.parchmentDim }} />
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.8, color: T.copper, textTransform: "uppercase" }}>
+                Advanced — longer chains, branches with real weight
+              </div>
+              <div style={{ flex: 1, height: 1, background: T.parchmentDim }} />
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, letterSpacing: 0.4 }}>
+              EXERCISE {i + 1} OF {SKETCH_EXERCISES.length}
+            </span>
+            <span
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 10,
+                letterSpacing: 0.4,
+                color: ex.level === "Advanced" ? T.copper : T.inkSoft,
+                background: ex.level === "Advanced" ? "rgba(201,124,61,0.1)" : T.parchmentDim,
+                padding: "2px 8px",
+                borderRadius: 10,
+                textTransform: "uppercase",
+              }}
+            >
+              {ex.level}
+            </span>
           </div>
           <FlowExercise exercise={ex} solved={savedScore !== undefined || solvedIds.has(ex.id)} onSolved={() => markSolved(ex.id)} />
         </div>
       ))}
+    </div>
+  );
+}
+
+function Lesson7({ savedScore, onQuizComplete }) {
+  return (
+    <div style={{ maxWidth: 660 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 7 — BUILD & TEST DISCIPLINE
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        The actual craft
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~7 min read</div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          This is the difference between a freelancer who "made something that worked once in the demo" and
+          one who delivers something that keeps working correctly for months. It's not about knowing more
+          nodes — it's about discipline.
+        </p>
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginTop: 6, marginBottom: 12 }}>
+        4.1 — Map it out before you touch the tool
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 20 }}>
+        Before opening n8n or Make.com, write out in plain language: the trigger, every action in order, and
+        any conditions that change the path. A simple numbered list or napkin sketch is enough — this single
+        habit prevents the most common beginner mistake, which is building half a workflow and realizing the
+        logic doesn't actually match what the client needs.
+      </p>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 12 }}>
+        4.2 — Data mapping in practice
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 20 }}>
+        Every action in a chain usually needs specific pieces of information from an earlier step — the
+        mapping is what tells the platform "put the value from the trigger's <em>email</em> field into this
+        action's <em>recipient</em> field." Both n8n and Make.com show you the available fields from prior
+        steps directly in the interface when you're building an action — you rarely need to guess field
+        names blindly.
+      </p>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 14 }}>
+        4.3 — Build and test one step at a time
+      </h2>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 28, minWidth: 0 }}>
+        <div style={{ background: "rgba(76,175,109,0.08)", border: `1.5px solid ${T.signal}`, borderRadius: 8, padding: "16px 18px", minWidth: 0 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.signal, marginBottom: 8, textTransform: "uppercase" }}>
+            Do this
+          </div>
+          <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+            Build the trigger, run a test execution, confirm the data looks right. Add the next action, test
+            again. Repeat.
+          </p>
+        </div>
+        <div style={{ background: "rgba(209,85,74,0.06)", border: "1.5px solid #D1554A", borderRadius: 8, padding: "16px 18px", minWidth: 0 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: "#B5523F", marginBottom: 8, textTransform: "uppercase" }}>
+            Not this
+          </div>
+          <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+            Building all 6 steps blind and only testing at the very end — when something breaks, you won't
+            know which of the 6 steps caused it.
+          </p>
+        </div>
+      </div>
+
+      <MixedQuiz
+        matchPairs={LESSON7_PAIRS}
+        matchLabel="Match each phase to what happens in it"
+        questions={[LESSON7_SCENARIO, LESSON7_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A scenario call and a quick check, plus one match-up."
+      />
     </div>
   );
 }
@@ -1758,6 +1948,12 @@ export default function App() {
           <Lesson6
             savedScore={completed[6]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 6: score }))}
+          />
+        )}
+        {activeLesson === 7 && (
+          <Lesson7
+            savedScore={completed[7]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 7: score }))}
           />
         )}
       </div>
