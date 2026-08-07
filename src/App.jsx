@@ -170,6 +170,67 @@ const LESSON3_MC = {
   explain: "Zero infrastructure to manage means fewer things that can go wrong while you're still building confidence — you add n8n once you're ready for clients who specifically need it.",
 };
 
+// Lesson 4 quiz data
+const LESSON4_PAIRS = [
+  { term: "OAuth", def: "A secure 'Sign in with Google/Slack/etc.' popup — the client authorizes access without ever sharing a password." },
+  { term: "API key", def: "A private access code generated inside an app's own settings, used to authorize a workflow to act on its behalf." },
+];
+
+const LESSON4_SCENARIO = {
+  q: "A client's CRM doesn't support webhooks at all. They want to be notified within a reasonable delay whenever a new deal is added. What's the right approach?",
+  options: [
+    "It's impossible — without a webhook, no automation can work",
+    "A polling trigger, checking the CRM on a schedule (e.g. every 15 minutes) for anything new",
+    "Ask the client to manually forward every new deal by email instead",
+    "Use a webhook anyway — most apps secretly support it even if undocumented",
+  ],
+  correct: 1,
+  explain: "Polling is exactly the fallback for tools without webhook support. It's not instant, but it still removes the manual work.",
+};
+
+const LESSON4_MC = {
+  q: "A client's app offers a 'Sign in with Google' style login for connecting third-party tools. Why is that the better authentication choice here, when available?",
+  options: [
+    "It's always faster to set up than an API key, with no exceptions",
+    "The client authorizes access without ever having to share an actual password with you",
+    "OAuth doesn't require the client to do anything at all",
+    "It's required by law for all business automations",
+  ],
+  correct: 1,
+  explain: "The core benefit is trust and security — the client stays in control of their login credentials the whole time.",
+};
+
+// Lesson 5 quiz data
+const LESSON5_PAIRS = [
+  { term: "Lead capture & notification", def: "New form submission → add row to CRM/Sheet → notify via Slack/email." },
+  { term: "Conditional routing", def: "Trigger → router/IF → path A or path B, based on a condition." },
+  { term: "AI-enhanced step", def: "Trigger → LLM node classifies, summarizes, or drafts → action." },
+];
+
+const LESSON5_SCENARIO = {
+  q: "A client says: \"Every Friday, pull last week's sales numbers from our POS system and email me a summary.\" Which pattern is this?",
+  options: [
+    "Lead capture & notification",
+    "Scheduled data sync / reporting",
+    "Multi-step approval / confirmation chain",
+    "Conditional routing",
+  ],
+  correct: 1,
+  explain: "It runs on a timer rather than an event, and compiles data into a report — the exact shape of scheduled data sync / reporting.",
+};
+
+const LESSON5_MC = {
+  q: "A client wants high-value leads (deal size over $1,000) to alert their sales manager directly, while smaller leads go into a standard follow-up queue. Which pattern are they describing, on top of lead capture?",
+  options: [
+    "AI-enhanced step",
+    "Scheduled data sync / reporting",
+    "Conditional routing — this is what separates a \"Standard\" package from \"Basic\" in pricing",
+    "None of the five patterns cover this",
+  ],
+  correct: 2,
+  explain: "A decision point based on a condition (deal value) is exactly conditional routing — very often combined with lead capture, as it is here.",
+};
+
 // ---------- Small UI pieces ----------
 function LessonBadge({ n, state }) {
   const bg = state === "current" ? T.copper : state === "done" ? T.signal : "transparent";
@@ -911,6 +972,230 @@ function Lesson3({ savedScore, onQuizComplete }) {
   );
 }
 
+function Lesson4({ savedScore, onQuizComplete }) {
+  return (
+    <div style={{ maxWidth: 660 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 4 — TRIGGERS
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        Webhook vs. polling — and how a client hands you the keys
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~6 min read</div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          A client will ask "how fast will it happen?" on almost every job. Knowing which trigger type their
+          tools support is what lets you answer that honestly instead of guessing.
+        </p>
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginTop: 6, marginBottom: 12 }}>
+        Polling vs. webhook
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 18 }}>
+        A <strong>polling trigger</strong> checks a source on a schedule — every 15 minutes, say — for
+        anything new. A <strong>webhook trigger</strong> is instant: the source app pushes a notification the
+        moment something happens, with no delay.
+      </p>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 26 }}>
+        Most modern apps — form tools, CRMs, payment platforms — support webhook triggers. Understanding
+        which type a client's specific tools support tells you how "instant" their automation can
+        realistically be, before you ever promise them a timeline.
+      </p>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 12 }}>
+        Authentication: what the client needs to give you
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 18 }}>
+        Connecting an automation to an app almost always requires either logging in via{" "}
+        <strong>OAuth</strong> — a secure "Sign in with Google/Slack/etc." popup where the client authorizes
+        access without ever sharing a password — or providing an <strong>API key</strong>, a private access
+        code generated inside that app's own settings.
+      </p>
+
+      <div
+        style={{
+          background: T.parchmentDim,
+          borderRadius: 8,
+          padding: "18px 20px",
+          margin: "8px 0 28px 0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <BookOpen size={16} color={T.copper} />
+          <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: 0.6, color: T.copper, textTransform: "uppercase" }}>
+            Rule to remember
+          </span>
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 16, color: T.ink, margin: 0, lineHeight: 1.65 }}>
+          Always have the client generate their own OAuth login or API key rather than handing you their
+          actual password. Never ask for — or accept — a plain password.
+        </p>
+      </div>
+
+      <MixedQuiz
+        matchPairs={LESSON4_PAIRS}
+        matchLabel="Match each authentication method to its definition"
+        questions={[LESSON4_SCENARIO, LESSON4_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A scenario call and a quick check, plus one match-up."
+      />
+    </div>
+  );
+}
+
+function PatternCard({ n, name, shape, desc }) {
+  return (
+    <div style={{ padding: "16px 18px", background: T.parchmentDim, borderRadius: 8, marginBottom: 12, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 5,
+            background: T.copper,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: FONTS.mono,
+            fontSize: 11.5,
+            flexShrink: 0,
+          }}
+        >
+          {n}
+        </div>
+        <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 15.5, color: T.ink }}>{name}</div>
+      </div>
+      <div
+        style={{
+          fontFamily: FONTS.mono,
+          fontSize: 12.5,
+          color: T.wire,
+          background: "#fff",
+          borderRadius: 6,
+          padding: "8px 12px",
+          marginBottom: 8,
+          overflowWrap: "break-word",
+        }}
+      >
+        {shape}
+      </div>
+      <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, lineHeight: 1.6, margin: 0 }}>{desc}</p>
+    </div>
+  );
+}
+
+function Lesson5({ savedScore, onQuizComplete }) {
+  return (
+    <div style={{ maxWidth: 660 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 5 — THE FIVE PATTERNS
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        The backbone of every client job
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~9 min read</div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Almost every small-business automation request is a variation on five patterns. Learn these deeply
+          and you can confidently scope and quote nearly any order — instead of feeling lost every time a
+          client describes their process in their own words.
+        </p>
+      </div>
+
+      <PatternCard
+        n={1}
+        name="Lead capture & notification"
+        shape="New form submission → Add row to CRM/Sheet → Notify via Slack/email"
+        desc="The single most commonly requested pattern. A new lead, order, or inquiry needs to land in a system of record and alert the right person immediately, instead of living only in an inbox someone might miss."
+      />
+      <PatternCard
+        n={2}
+        name="Scheduled data sync / reporting"
+        shape="Scheduled time → Pull data from source → Compile into report/sheet"
+        desc="Runs on a timer rather than an event — e.g. a daily summary pulled from a sales tool into a spreadsheet, or a weekly digest email compiled from several sources."
+      />
+      <PatternCard
+        n={3}
+        name="Conditional routing"
+        shape="Trigger → Router / IF → Path A or Path B"
+        desc="Adds a decision point — e.g. routing a high-value lead to a manager's direct notification while lower-value leads go into a standard follow-up queue. This is what separates a 'Standard' package from 'Basic' in your pricing."
+      />
+      <PatternCard
+        n={4}
+        name="AI-enhanced step"
+        shape="Trigger → LLM node (classify/summarize/draft) → Action"
+        desc="Inserting an AI step into the workflow — e.g. classifying an incoming support message by topic, summarizing a long email thread, or drafting a first-pass reply for human review. A genuine premium differentiator."
+      />
+      <PatternCard
+        n={5}
+        name="Multi-step approval / confirmation chain"
+        shape="Trigger → Create record → Notify → Confirmation"
+        desc="A new order or request triggers several downstream actions in sequence — e.g. generating an invoice, notifying a team channel, and creating a calendar event, all from one starting trigger."
+      />
+
+      <div
+        style={{
+          background: T.graphite,
+          borderRadius: 8,
+          padding: "20px 22px",
+          margin: "26px 0 30px 0",
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 10, textTransform: "uppercase" }}>
+          The pattern behind all five
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: "#EFEAD9", margin: 0, lineHeight: 1.75 }}>
+          Identify the one manual, repetitive action the client currently does by hand → identify what event
+          should replace their reason for doing it → identify every downstream action that currently happens
+          manually afterward → chain those into trigger → conditional logic (if needed) → actions, testing
+          each connection individually before testing the whole chain.
+        </p>
+      </div>
+
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75 }}>
+        Most real jobs are one pattern, or two combined — like lead capture plus conditional routing in the
+        scenario above. Once you can name the pattern out loud, the build almost plans itself.
+      </p>
+
+      <MixedQuiz
+        matchPairs={LESSON5_PAIRS}
+        matchLabel="Match each pattern name to its shape"
+        questions={[LESSON5_SCENARIO, LESSON5_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A scenario call and a quick check, plus one match-up."
+      />
+    </div>
+  );
+}
+
 // ---------- App shell ----------
 export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1049,6 +1334,18 @@ export default function App() {
           <Lesson3
             savedScore={completed[3]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 3: score }))}
+          />
+        )}
+        {activeLesson === 4 && (
+          <Lesson4
+            savedScore={completed[4]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 4: score }))}
+          />
+        )}
+        {activeLesson === 5 && (
+          <Lesson5
+            savedScore={completed[5]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 5: score }))}
           />
         )}
       </div>
