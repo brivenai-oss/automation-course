@@ -171,6 +171,18 @@ const LESSON3_MC = {
   explain: "Zero infrastructure to manage means fewer things that can go wrong while you're still building confidence — you add n8n once you're ready for clients who specifically need it.",
 };
 
+const LESSON3_VOLUME = {
+  q: "A client currently gets about 400 form submissions a month, and the workflow you're planning needs roughly 5 steps per submission. Why is this worth a pricing conversation up front, rather than assuming Make's free tier will comfortably cover it?",
+  options: [
+    "Free tiers never expire, so volume is never actually a concern",
+    "At roughly 5 operations per run × 400 runs, that's about 2,000 operations a month — likely to exceed Make's free-tier allowance",
+    "Make.com technically can't handle 400 monthly triggers at all",
+    "This volume specifically requires n8n — there's no other option",
+  ],
+  correct: 1,
+  explain: "A rough operations-per-run × runs-per-month estimate takes 30 seconds and saves you from either an awkward mid-project cost surprise or promising something the free tier can't actually deliver.",
+};
+
 // Sketch practice exercises — the learner builds a trigger/action/condition shape, we check its structure.
 // expected: { preActions: exact # of actions before any condition, condition: bool,
 //             pathA/pathB: exact # of actions on each branch (only used when condition is true) }
@@ -263,6 +275,18 @@ const LESSON4_MC = {
   explain: "The core benefit is trust and security — the client stays in control of their login credentials the whole time.",
 };
 
+const LESSON4_CREDS = {
+  q: "You're testing a new API key for a client's project. What's the safest way to use it inside your workflow?",
+  options: [
+    "Paste it directly into the HTTP request node's URL field so it's easy to find later",
+    "Save it in the platform's Credentials/Connections manager and reference the saved connection",
+    "Text it to yourself as a backup, just in case",
+    "Ask the client for their actual account password instead of using an API key",
+  ],
+  correct: 1,
+  explain: "The credential manager keeps the key out of anything you might later export, screenshot, or share — pasting it inline is the single most common security mistake found across thousands of real public workflows.",
+};
+
 // Lesson 5 quiz data
 const LESSON5_PAIRS = [
   { term: "Lead capture & notification", def: "New form submission → add row to CRM/Sheet → notify via Slack/email." },
@@ -324,6 +348,187 @@ const LESSON7_MC = {
   correct: 1,
   explain: "This is the single most common beginner mistake the guide calls out — it turns a 5-minute fix into a much longer hunt through every step.",
 };
+
+// Lesson 8 quiz data
+const LESSON8_PAIRS = [
+  { term: "Fallback / error path", def: "Notifies the client (or you) if a step fails, rather than silently doing nothing." },
+  { term: "Required-field check", def: "A quick check for obviously missing required data before it reaches a critical action." },
+  { term: "Duplicate-trigger awareness", def: "Knowing whether a duplicate trigger would create a duplicate record — and whether that's acceptable for this specific workflow." },
+  { term: "Rate limits & pacing", def: "APIs aren't infinitely scalable — hitting one too hard can get a workflow temporarily or permanently blocked." },
+];
+
+const LESSON8_SCENARIO = {
+  q: "A workflow adds a new row to a spreadsheet whenever a form is submitted, then emails a confirmation using the submitter's email field. What should you add to guard against a blank email field breaking that step?",
+  options: [
+    "Nothing — Make.com and n8n handle blank fields automatically",
+    "A quick check for obviously missing required data before it reaches the email action",
+    "Delete the workflow and rebuild it from scratch every time this happens",
+    "Ask the client to never leave any field blank, ever",
+  ],
+  correct: 1,
+  explain: "Catching the missing field before it reaches a critical action is exactly the kind of guard that separates a demo from something reliable.",
+};
+
+const LESSON8_MC = {
+  q: "Why build a fallback/error notification path instead of letting a failed step fail silently?",
+  options: [
+    "It makes the workflow run faster",
+    "So someone actually finds out immediately, instead of a client silently missing data for days without knowing anything broke",
+    "It's required by Make.com and n8n's terms of service",
+    "It's optional — real error handling only matters for enterprise clients",
+  ],
+  correct: 1,
+  explain: "Silent failure is the single most damaging kind — the client has no idea anything is wrong until they notice the missing result themselves, possibly weeks later.",
+};
+
+// Debugging drills — diagnose the likely cause before revealing the answer
+const DEBUG_DRILLS = [
+  {
+    scenario:
+      "A Slack message fires every time a new form response comes in — the notification always arrives, but the message text is always blank.",
+    options: [
+      "The trigger isn't connected to the right form",
+      "The data mapping on the Slack action isn't pulling from the correct trigger field",
+      "Slack is temporarily down",
+      "The workflow was never turned on",
+    ],
+    correct: 1,
+    explain: "The message is arriving reliably, which means the trigger is firing fine and Slack is reachable — the problem is narrower than that. A blank field is almost always a mapping issue: the message text box is either empty or pointing at the wrong field from the trigger's output.",
+  },
+  {
+    scenario:
+      "Every time a new lead comes in, two duplicate rows get added to the CRM instead of one — even though the client only submitted the form once.",
+    options: [
+      "The CRM's API is broken",
+      "The trigger is firing twice for the same event — a classic duplicate-trigger issue",
+      "The client secretly submitted the form twice",
+      "This is random and can't really be diagnosed",
+    ],
+    correct: 1,
+    explain: "This is exactly the duplicate-trigger risk the guide flags in 4.4 — a polling trigger with overlapping check windows, or a source app that occasionally fires the same event twice, is the usual cause. The fix is checking for that awareness at build time, not guessing after delivery.",
+  },
+  {
+    scenario:
+      "The workflow ran perfectly every time during testing. In production, a step occasionally fails — and when it does, nothing happens. No error, no notification, no record of it.",
+    options: [
+      "The client's account must have expired",
+      "There's no fallback/error path configured, so a failure just goes unnoticed",
+      "The time zone setting is probably wrong",
+      "It needs more actions added to the chain",
+    ],
+    correct: 1,
+    explain: "This is the textbook case for why a fallback/error path matters — without one, a failure is invisible by default. It's not that failures happen (real-world data is always a bit messy) — it's that nobody finds out when they do.",
+  },
+  {
+    scenario:
+      "A workflow that syncs contacts into a CRM works perfectly in testing with 5 sample records. In production, syncing a real batch of 500 contacts, it starts failing partway through with 'too many requests' errors.",
+    options: [
+      "The CRM's servers are down for maintenance",
+      "The workflow is hitting the CRM's API rate limit by firing requests too quickly, back to back",
+      "The trigger must be firing twice for every contact",
+      "The client's CRM account ran out of storage space",
+    ],
+    correct: 1,
+    explain: "This is rate limiting — APIs cap how many requests they'll accept in a short window. It's invisible at small test volumes and only shows up at real production scale, which is exactly why it catches people off guard. The fix is usually a short delay or batching between rapid-fire requests in high-volume workflows.",
+  },
+];
+
+// Lesson 9 quiz data
+const LESSON9_PAIRS = [
+  { term: "Canvas notes", def: "Short text notes added directly inside the workflow explaining what each major section does, in plain language." },
+  { term: "Client documentation", def: "A plain-language explanation, under 250 words, covering what the automation does, what happens if it breaks, and who to contact." },
+  { term: "Own-account delivery", def: "Building the automation inside the client's own Make.com/n8n account, so they own the workflow long-term." },
+];
+
+const LESSON9_SCENARIO = {
+  q: "You built an automation entirely inside your own Make.com account instead of the client's, since it was faster during the build. Two months later, you're slammed with other client work and let your own account lapse. What's the direct consequence for that specific client?",
+  options: [
+    "Nothing — the automation isn't affected by whose account it lives in",
+    "Their previously-working automation could stop functioning through no fault of their own, since it was never actually inside their own account",
+    "The client automatically gets a full refund",
+    "Make.com transfers ownership to the client automatically after 60 days",
+  ],
+  correct: 1,
+  explain: "This is exactly the reliability problem the guide warns about — a 'runs forever in the background' service that actually depends on your account staying healthy isn't reliable at all.",
+};
+
+const LESSON9_MC = {
+  q: "What should the client-facing documentation you deliver actually cover?",
+  options: [
+    "A node-by-node technical breakdown of every setting you configured",
+    "What the automation does, what happens if something breaks, and who to contact",
+    "Your personal pricing for future work",
+    "A list of every Make.com/n8n feature that exists, for their general reference",
+  ],
+  correct: 1,
+  explain: "It's written for a non-technical reader — the goal is confidence that the system is understood and supported, not a technical manual they'd never use.",
+};
+
+const QA_CHECKLIST = [
+  "Trigger tested and confirmed firing correctly on real or realistic sample data",
+  "Every action tested individually, not just the full chain",
+  "At least one edge case tested (missing/blank field, duplicate entry)",
+  "Error/fallback path tested by intentionally forcing a failure",
+  "Canvas notes/comments added explaining each major section",
+  "Workflow lives inside the client's own account, not yours",
+  "Plain-language documentation delivered alongside the workflow",
+];
+
+// Worked examples — one before/after case study per pattern, Lesson 5
+const WORKED_EXAMPLES = [
+  {
+    pattern: "Lead capture & notification",
+    before:
+      "A boutique owner checks her Squarespace contact form inbox every morning, manually copies each new inquiry into a Google Sheet, then texts her assistant to follow up on each one.",
+    after: {
+      trigger: "New Squarespace form submission",
+      preActions: ["Add row to Google Sheet", "Notify assistant via Slack"],
+      condition: null,
+    },
+  },
+  {
+    pattern: "Scheduled data sync / reporting",
+    before:
+      "Every Friday afternoon, an e-commerce owner logs into Shopify, exports last week's order totals by hand, and builds a summary email to send her business partner.",
+    after: {
+      trigger: "Scheduled — every Friday at 4pm",
+      preActions: ["Pull last week's order data from Shopify", "Compile & email summary to partner"],
+      condition: null,
+    },
+  },
+  {
+    pattern: "Conditional routing",
+    before:
+      "A consultant personally reads every new inquiry email to gauge urgency — replying immediately herself to anything that sounds like a rush job, or forwarding everything else to her intern's standard scheduling queue.",
+    after: {
+      trigger: "New inquiry email",
+      preActions: [],
+      condition: "Marked urgent?",
+      pathA: ["Notify consultant directly"],
+      pathB: ["Add to intern's queue"],
+    },
+  },
+  {
+    pattern: "AI-enhanced step",
+    before:
+      "A small team's shared support inbox gets 50+ emails a day. The team lead reads each one by hand just to figure out which department — billing, technical, or general — it belongs to, before forwarding it on.",
+    after: {
+      trigger: "New support email",
+      preActions: ["AI step classifies topic (billing / technical / general)", "Route to the matching department's Slack channel"],
+      condition: null,
+    },
+  },
+  {
+    pattern: "Multi-step approval / confirmation chain",
+    before:
+      "When a new client signs a contract, the agency owner manually creates an invoice in QuickBooks, posts a note in the team Slack channel, and adds a delivery deadline to the shared calendar — three separate steps, every single time.",
+    after: {
+      trigger: "New signed contract",
+      preActions: ["Generate invoice in QuickBooks", "Notify team Slack channel", "Create calendar event with deadline"],
+      condition: null,
+    },
+  },
+];
 
 // ---------- Small UI pieces ----------
 function LessonBadge({ n, state }) {
@@ -788,9 +993,12 @@ function FlowBox({ label, kind, onRemove }) {
         border: `1.5px solid ${colors[kind]}`,
         background: "#fff",
         flexShrink: 0,
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        minWidth: 0,
       }}
     >
-      <span style={{ fontFamily: FONTS.mono, fontSize: 12.5, color: colors[kind] }}>{label}</span>
+      <span style={{ fontFamily: FONTS.mono, fontSize: 12.5, color: colors[kind], overflowWrap: "break-word", minWidth: 0 }}>{label}</span>
       {onRemove && (
         <button
           onClick={onRemove}
@@ -866,21 +1074,23 @@ function ConditionDiamond({ onRemove }) {
           IF
         </span>
       </div>
-      <button
-        onClick={onRemove}
-        style={{
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          color: T.inkSoft,
-          fontFamily: FONTS.mono,
-          fontSize: 10.5,
-          marginTop: 2,
-          textDecoration: "underline",
-        }}
-      >
-        remove
-      </button>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: T.inkSoft,
+            fontFamily: FONTS.mono,
+            fontSize: 10.5,
+            marginTop: 2,
+            textDecoration: "underline",
+          }}
+        >
+          remove
+        </button>
+      )}
     </div>
   );
 }
@@ -1084,6 +1294,254 @@ function FlowExercise({ exercise, solved, onSolved }) {
             {feedback.message}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+function DebugDrill({ index, drill }) {
+  const [selected, setSelected] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+  const isCorrect = selected === drill.correct;
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 16, minWidth: 0 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 0.6, color: "#B5523F", marginBottom: 8, textTransform: "uppercase" }}>
+        Broken workflow {index}
+      </div>
+      <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: T.ink, lineHeight: 1.6, margin: "0 0 16px 0" }}>{drill.scenario}</p>
+
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.wire, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        What's the likely cause?
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+        {drill.options.map((opt, oi) => {
+          const isSelected = selected === oi;
+          const isCorrectOpt = oi === drill.correct;
+          let borderColor = T.parchmentDim;
+          let bg = "transparent";
+          if (revealed) {
+            if (isCorrectOpt) {
+              borderColor = T.signal;
+              bg = "rgba(76,175,109,0.08)";
+            } else if (isSelected) {
+              borderColor = "#D1554A";
+              bg = "rgba(209,85,74,0.06)";
+            }
+          } else if (isSelected) {
+            borderColor = T.wire;
+            bg = "rgba(76,139,245,0.06)";
+          }
+          return (
+            <button
+              key={oi}
+              disabled={revealed}
+              onClick={() => setSelected(oi)}
+              style={{
+                textAlign: "left",
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: T.ink,
+                padding: "10px 14px",
+                borderRadius: 7,
+                border: `1.5px solid ${borderColor}`,
+                background: bg,
+                cursor: revealed ? "default" : "pointer",
+                lineHeight: 1.4,
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+
+      {!revealed ? (
+        <button
+          disabled={selected === null}
+          onClick={() => setRevealed(true)}
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            padding: "9px 18px",
+            borderRadius: 7,
+            border: "none",
+            background: selected !== null ? T.copper : "#D8D2BE",
+            color: "#fff",
+            cursor: selected !== null ? "pointer" : "not-allowed",
+          }}
+        >
+          Reveal likely cause
+        </button>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            fontFamily: FONTS.body,
+            fontSize: 14,
+            color: T.ink,
+            borderLeft: `2.5px solid ${isCorrect ? T.signal : "#D1554A"}`,
+            paddingLeft: 14,
+          }}
+        >
+          <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 13.5, color: isCorrect ? T.signal : "#B5523F" }}>
+            {isCorrect ? "That's the one." : "Not quite — here's the likely cause:"}
+          </div>
+          <div style={{ lineHeight: 1.6 }}>{drill.explain}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function QAChecklist({ items }) {
+  const [checked, setChecked] = useState(() => Array(items.length).fill(false));
+  const doneCount = checked.filter(Boolean).length;
+
+  const toggle = (i) => setChecked((c) => c.map((v, idx) => (idx === i ? !v : v)));
+
+  return (
+    <div style={{ background: T.parchmentDim, borderRadius: 8, padding: "18px 20px", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: 0.6, color: T.copper, textTransform: "uppercase" }}>
+          Pre-delivery QA checklist
+        </span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft }}>
+          {doneCount} / {items.length}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((item, i) => (
+          <button
+            key={i}
+            onClick={() => toggle(i)}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              textAlign: "left",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              padding: "4px 0",
+              width: "100%",
+            }}
+          >
+            <div
+              style={{
+                width: 17,
+                height: 17,
+                borderRadius: 4,
+                border: `1.5px solid ${checked[i] ? T.signal : T.inkSoft}`,
+                background: checked[i] ? T.signal : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                marginTop: 2,
+              }}
+            >
+              {checked[i] && <CheckCircle2 size={12} color="#fff" strokeWidth={3} />}
+            </div>
+            <span
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: checked[i] ? T.inkSoft : T.ink,
+                textDecoration: checked[i] ? "line-through" : "none",
+                lineHeight: 1.5,
+              }}
+            >
+              {item}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+function WorkedExample({ index, example }) {
+  const { pattern, before, after } = example;
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 18, minWidth: 0 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 16, textTransform: "uppercase" }}>
+        Worked example {index} · {pattern}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, minWidth: 0 }}>
+        {/* Before */}
+        <div
+          style={{
+            background: T.parchment,
+            border: `1px dashed ${T.parchmentDim}`,
+            borderRadius: 8,
+            padding: "16px 18px",
+            transform: "rotate(-0.4deg)",
+            minWidth: 0,
+          }}
+        >
+          <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 0.6, color: T.inkSoft, marginBottom: 8, textTransform: "uppercase" }}>
+            Before — manual
+          </div>
+          <p style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, lineHeight: 1.6, margin: 0 }}>{before}</p>
+        </div>
+
+        {/* After */}
+        <div style={{ background: "rgba(76,139,245,0.05)", border: `1px solid ${T.parchmentDim}`, borderRadius: 8, padding: "16px 18px", minWidth: 0 }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 0.6, color: T.wire, marginBottom: 12, textTransform: "uppercase" }}>
+            After — automated
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+            <FlowBox label={after.trigger} kind="trigger" />
+            {after.preActions.map((a, i) => (
+              <React.Fragment key={i}>
+                <Arrow />
+                <FlowBox label={a} kind="action" />
+              </React.Fragment>
+            ))}
+            {after.condition && (
+              <>
+                <Arrow />
+                <ConditionDiamond />
+              </>
+            )}
+          </div>
+
+          {after.condition && (
+            <>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: T.signal, margin: "6px 0 12px 0" }}>{after.condition}</div>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>If yes</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {after.pathA.map((a, i) => (
+                      <FlowBox key={i} label={a} kind="action" />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>If no</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {after.pathB.map((a, i) => (
+                      <FlowBox key={i} label={a} kind="action" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1372,13 +1830,35 @@ function Lesson3({ savedScore, onQuizComplete }) {
         </p>
       </div>
 
+      <div
+        style={{
+          background: "rgba(201,124,61,0.08)",
+          borderLeft: `3px solid ${T.copper}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          margin: "26px 0 10px 0",
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 6, textTransform: "uppercase" }}>
+          Reality check on "free"
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Make's free tier runs on roughly 1,000 operations a month across up to two active scenarios — and
+          each step in a run typically counts as one operation, so a 5-step scenario running just a few
+          hundred times a month can burn through it fast. And n8n's self-hosted option has no software cost,
+          but you're the one setting up and maintaining the server — it isn't free of effort. Both are still
+          the right starting points; just do the rough math before promising a client the free tier will
+          cover their volume forever.
+        </p>
+      </div>
+
       <MixedQuiz
         matchPairs={LESSON3_PAIRS}
         matchLabel="Match each tool to its defining strength"
-        questions={[LESSON3_SCENARIO, LESSON3_MC]}
+        questions={[LESSON3_SCENARIO, LESSON3_MC, LESSON3_VOLUME]}
         savedScore={savedScore}
         onComplete={onQuizComplete}
-        intro="A scenario call and a quick check, plus one match-up."
+        intro="A scenario call and two quick checks, plus one match-up."
       />
     </div>
   );
@@ -1457,13 +1937,34 @@ function Lesson4({ savedScore, onQuizComplete }) {
         </p>
       </div>
 
+      <div
+        style={{
+          background: "rgba(201,124,61,0.08)",
+          borderLeft: `3px solid ${T.copper}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          margin: "8px 0 28px 0",
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 6, textTransform: "uppercase" }}>
+          Security habit worth building early
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Never paste an API key directly into a text field inside a node or module. Both platforms have a
+          dedicated Credentials/Connections manager — save the key there once, then reference that saved
+          connection everywhere it's needed. It's one of the most common mistakes found across thousands of
+          real public workflows, and it keeps the credential out of anything you might export, screen-share,
+          or accidentally show a client.
+        </p>
+      </div>
+
       <MixedQuiz
         matchPairs={LESSON4_PAIRS}
         matchLabel="Match each authentication method to its definition"
-        questions={[LESSON4_SCENARIO, LESSON4_MC]}
+        questions={[LESSON4_SCENARIO, LESSON4_MC, LESSON4_CREDS]}
         savedScore={savedScore}
         onComplete={onQuizComplete}
-        intro="A scenario call and a quick check, plus one match-up."
+        intro="A scenario call and two quick checks, plus one match-up."
       />
     </div>
   );
@@ -1520,7 +2021,7 @@ function Lesson5({ savedScore, onQuizComplete }) {
       <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
         The backbone of every client job
       </h1>
-      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~9 min read</div>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~13 min read</div>
 
       <div
         style={{
@@ -1572,6 +2073,12 @@ function Lesson5({ savedScore, onQuizComplete }) {
         desc="A new order or request triggers several downstream actions in sequence — e.g. generating an invoice, notifying a team channel, and creating a calendar event, all from one starting trigger."
       />
 
+      <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.inkSoft, lineHeight: 1.6, marginBottom: 26, fontStyle: "italic" }}>
+        Worth knowing: as of 2026, n8n has pulled ahead of Make.com specifically on native AI-agent building
+        blocks (including a first-class Claude node) — worth remembering from Lesson 3 if a client's request
+        leans heavily on pattern 4.
+      </p>
+
       <div
         style={{
           background: T.graphite,
@@ -1591,10 +2098,22 @@ function Lesson5({ savedScore, onQuizComplete }) {
         </p>
       </div>
 
-      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75 }}>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 30 }}>
         Most real jobs are one pattern, or two combined — like lead capture plus conditional routing in the
         scenario above. Once you can name the pattern out loud, the build almost plans itself.
       </p>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 6 }}>
+        Worked examples
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, lineHeight: 1.6, marginBottom: 20 }}>
+        One real before/after for each pattern — the messy manual version on the left, the same job broken
+        into trigger, actions, and conditions on the right.
+      </p>
+
+      {WORKED_EXAMPLES.map((ex, i) => (
+        <WorkedExample key={i} index={i + 1} example={ex} />
+      ))}
 
       <MixedQuiz
         matchPairs={LESSON5_PAIRS}
@@ -1780,10 +2299,202 @@ function Lesson7({ savedScore, onQuizComplete }) {
         </div>
       </div>
 
+      <div
+        style={{
+          background: "rgba(201,124,61,0.08)",
+          borderLeft: `3px solid ${T.copper}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 6, textTransform: "uppercase" }}>
+          Reality check on timing
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          A real client job commonly runs 3-4x longer than a tutorial made it look — actual account access,
+          messier real data, and edge cases nobody warned you about all add up. This discipline doesn't
+          eliminate that gap, but it's exactly what keeps it from turning into a much bigger one.
+        </p>
+      </div>
+
       <MixedQuiz
         matchPairs={LESSON7_PAIRS}
         matchLabel="Match each phase to what happens in it"
         questions={[LESSON7_SCENARIO, LESSON7_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A scenario call and a quick check, plus one match-up."
+      />
+    </div>
+  );
+}
+
+function Lesson8({ savedScore, onQuizComplete }) {
+  return (
+    <div style={{ maxWidth: 660 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 8 — ERROR HANDLING
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        Fallbacks, and the duplicate-trigger trap
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~7 min read</div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          This is what separates "worked in the demo" from "actually reliable." Real-world data is messy — a
+          blank form field, a duplicate entry, an app being briefly unavailable. This lesson is about what
+          you build in ahead of time, so those moments don't turn into a client silently losing data.
+        </p>
+      </div>
+
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 24 }}>
+        Four habits handle almost every real-world failure case:
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 30 }}>
+        <TermCard term="Fallback / error path" def="Notify the client (or yourself) if a step fails, rather than letting it silently do nothing." />
+        <TermCard term="Required-field check" def="A quick check for obviously missing required data before it reaches a critical action." />
+        <TermCard term="Duplicate-trigger awareness" def="Know whether a duplicate trigger event would create a duplicate record — and whether that's acceptable for this specific workflow." />
+        <TermCard term="Rate limits & pacing" def="APIs aren't infinitely scalable — hitting one too hard can get a workflow temporarily or permanently blocked. Add a short delay between rapid-fire requests in high-volume workflows." />
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 6 }}>
+        Debugging drills
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, lineHeight: 1.6, marginBottom: 20 }}>
+        Three broken workflows, described the way a client would describe them to you. Pick what you think
+        is actually going on before revealing the likely cause — this is the exact diagnostic reflex you'll
+        use on real jobs.
+      </p>
+
+      {DEBUG_DRILLS.map((d, i) => (
+        <DebugDrill key={i} index={i + 1} drill={d} />
+      ))}
+
+      <MixedQuiz
+        matchPairs={LESSON8_PAIRS}
+        matchLabel="Match each habit to what it does"
+        questions={[LESSON8_SCENARIO, LESSON8_MC]}
+        savedScore={savedScore}
+        onComplete={onQuizComplete}
+        intro="A scenario call and a quick check, plus one match-up."
+      />
+    </div>
+  );
+}
+
+function Lesson9({ savedScore, onQuizComplete }) {
+  return (
+    <div style={{ maxWidth: 660 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 9 — DOCUMENTATION
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        Delivering to a real client
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~7 min read</div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why this matters for a real client
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          A working automation the client doesn't understand and doesn't actually own isn't really delivered
+          yet. This lesson is the last mile — the difference between "I built you a thing" and "you now have
+          a system you're in control of."
+        </p>
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginTop: 6, marginBottom: 12 }}>
+        Documenting the workflow
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 18 }}>
+        Leave short text notes directly inside the workflow — both platforms support
+        sticky-note/comment blocks right on the canvas — explaining what each major section does in plain
+        language. This is what lets a non-technical client, or a future freelancer they hire, understand the
+        system without you personally being on call forever.
+      </p>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 18 }}>
+        The same habit applies to the individual steps themselves: rename each one as you build, instead of
+        leaving the platform's generic default ("Set 12", "Function 8"). A step named{" "}
+        <em>"Format Date for Airtable"</em> tells the next person exactly what it does at a glance — the
+        default name tells them nothing.
+      </p>
+
+      <div
+        style={{
+          background: T.graphite,
+          borderRadius: 8,
+          padding: "18px 20px",
+          marginBottom: 26,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 10, textTransform: "uppercase" }}>
+          Copy-paste prompt — client-facing documentation
+        </div>
+        <p style={{ fontFamily: FONTS.mono, fontSize: 13, color: "#EFEAD9", margin: 0, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
+          {"I've built an automation with the following steps: [LIST TRIGGER AND ACTIONS IN ORDER].\nWrite a short, plain-language explanation (under 250 words) I can hand to a non-technical client describing what this automation does, what happens if something goes wrong, and who to contact for changes."}
+        </p>
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 12 }}>
+        Whose account should this live in?
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 10 }}>
+        Whenever possible, build the automation directly inside the client's own Make.com or n8n account
+        rather than yours.
+      </p>
+      <div
+        style={{
+          background: "rgba(209,85,74,0.06)",
+          borderLeft: "3px solid #D1554A",
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 28,
+        }}
+      >
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Build it in your own account instead, and either the client never really owns the workflow long
+          term, or your account gets suspended someday and you have to migrate everything under pressure — a
+          real reliability problem for a service that's supposed to run forever in the background.
+        </p>
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginBottom: 12 }}>
+        Before you call it done
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16, color: T.ink, lineHeight: 1.7, marginBottom: 16 }}>
+        Run through this before every delivery. Click each item as you'd genuinely check it.
+      </p>
+      <div style={{ marginBottom: 30 }}>
+        <QAChecklist items={QA_CHECKLIST} />
+      </div>
+
+      <MixedQuiz
+        matchPairs={LESSON9_PAIRS}
+        matchLabel="Match each term to its definition"
+        questions={[LESSON9_SCENARIO, LESSON9_MC]}
         savedScore={savedScore}
         onComplete={onQuizComplete}
         intro="A scenario call and a quick check, plus one match-up."
@@ -1954,6 +2665,18 @@ export default function App() {
           <Lesson7
             savedScore={completed[7]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 7: score }))}
+          />
+        )}
+        {activeLesson === 8 && (
+          <Lesson8
+            savedScore={completed[8]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 8: score }))}
+          />
+        )}
+        {activeLesson === 9 && (
+          <Lesson9
+            savedScore={completed[9]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 9: score }))}
           />
         )}
       </div>
