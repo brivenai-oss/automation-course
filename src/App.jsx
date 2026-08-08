@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Lock, CheckCircle2, X, BookOpen, Radio } from "lucide-react";
+import { Lock, CheckCircle2, X, BookOpen, Radio, Award } from "lucide-react";
 
 // ---------- Design tokens ----------
 const T = {
@@ -50,6 +50,7 @@ const LESSONS = [
   { id: 7, title: "Build & Test Discipline", subtitle: "The actual craft" },
   { id: 8, title: "Error Handling", subtitle: "Fallbacks & duplicate risk" },
   { id: 9, title: "Documentation", subtitle: "Delivering to a real client" },
+  { id: 10, title: "Certification", subtitle: "The milestone check", isCert: true },
 ];
 
 const GLOSSARY = [
@@ -530,8 +531,45 @@ const WORKED_EXAMPLES = [
   },
 ];
 
+// ---------- Certification test data ----------
+const CERT_BRIEF =
+  "A property management company gets maintenance requests through a web form on their site. Every request should be logged in their spreadsheet tracker — front-desk staff currently copy each one over by hand, and the unit-number field is often left blank when tenants rush through the form. If a request is marked \"emergency\" (a burst pipe, no heat, etc.), the on-call maintenance tech should get a text message immediately. Otherwise, it just needs to land in the weekly maintenance queue for review. One more thing: right now, if anything in this process breaks, nobody finds out until a tenant calls back annoyed — they'd like some kind of safety net for that.";
+
+const CERT_PATTERN_OPTIONS = [
+  { label: "Lead capture & notification" },
+  { label: "Scheduled data sync / reporting" },
+  { label: "Conditional routing" },
+  { label: "AI-enhanced step" },
+  { label: "Multi-step approval / confirmation chain" },
+];
+const CERT_PATTERN_CORRECT = [0, 2]; // Lead capture & notification + Conditional routing
+
+const CERT_FLOW_EXERCISE = {
+  scenario: "Build the trigger → actions → condition shape for the maintenance-request scenario above.",
+  expected: { preActions: 1, condition: true, pathA: 1, pathB: 1 },
+  successNote: "Trigger → log to tracker → condition on emergency status → text on-call tech or queue for review. That's the shape.",
+};
+
+const CERT_TOOL_OPTIONS = [
+  "n8n, because the client explicitly needs to self-host and write custom JavaScript logic",
+  "Make.com, since this is a straightforward small-business workflow with no self-hosting or custom-code requirement mentioned",
+  "Zapier, since it's the most well-known automation tool overall",
+  "It doesn't matter — any tool produces the same result",
+];
+const CERT_TOOL_CORRECT = 1;
+const CERT_TOOL_EXPLAIN =
+  "Nothing here calls for self-hosting or custom code — Make.com gets this built and delivered with zero infrastructure to manage, exactly the guide's default recommendation.";
+
+const CERT_ERROR_OPTIONS = [
+  { label: "A fallback/error path, since the client explicitly asked for a safety net when something breaks" },
+  { label: "A required-field check, since the unit number is often left blank on rushed submissions" },
+  { label: "Rate-limit pacing, since this workflow will fire thousands of times a minute" },
+  { label: "Duplicate-trigger awareness, since the scenario explicitly describes the same request arriving twice" },
+];
+const CERT_ERROR_CORRECT = [0, 1];
+
 // ---------- Small UI pieces ----------
-function LessonBadge({ n, state }) {
+function LessonBadge({ n, state, isCert }) {
   const bg = state === "current" ? T.copper : state === "done" ? T.signal : "transparent";
   const border = state === "locked" ? T.graphiteLine : bg;
   const color = state === "locked" ? T.inkSoft : "#fff";
@@ -553,7 +591,15 @@ function LessonBadge({ n, state }) {
         position: "relative",
       }}
     >
-      {state === "done" ? <CheckCircle2 size={15} /> : state === "locked" ? <Lock size={12} /> : n}
+      {state === "done" ? (
+        <CheckCircle2 size={15} />
+      ) : state === "locked" ? (
+        <Lock size={12} />
+      ) : isCert ? (
+        <Award size={14} />
+      ) : (
+        n
+      )}
       {state === "current" && (
         <span
           style={{
@@ -1548,6 +1594,233 @@ function WorkedExample({ index, example }) {
 }
 
 
+function MultiSelectQuestion({ prompt, options, correctSet, solved, onSolved }) {
+  const correctSetObj = new Set(correctSet);
+  const [selected, setSelected] = useState(new Set());
+  const [submitted, setSubmitted] = useState(!!solved);
+  const [wasCorrect, setWasCorrect] = useState(!!solved);
+
+  const toggle = (i) => {
+    if (submitted) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  };
+
+  const handleCheck = () => {
+    const correct = selected.size === correctSetObj.size && [...selected].every((i) => correctSetObj.has(i));
+    setSubmitted(true);
+    setWasCorrect(correct);
+    if (correct) onSolved();
+  };
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 18, minWidth: 0 }}>
+      <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: T.ink, lineHeight: 1.6, margin: "0 0 6px 0" }}>{prompt}</p>
+      <p style={{ fontFamily: FONTS.mono, fontSize: 11, color: T.inkSoft, marginBottom: 16, textTransform: "uppercase", letterSpacing: 0.4 }}>
+        Select all that apply
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+        {options.map((opt, i) => {
+          const isSelected = selected.has(i);
+          const isCorrectOpt = correctSetObj.has(i);
+          let borderColor = T.parchmentDim;
+          let bg = "transparent";
+          if (submitted) {
+            if (isCorrectOpt) {
+              borderColor = T.signal;
+              bg = "rgba(76,175,109,0.08)";
+            } else if (isSelected) {
+              borderColor = "#D1554A";
+              bg = "rgba(209,85,74,0.06)";
+            }
+          } else if (isSelected) {
+            borderColor = T.wire;
+            bg = "rgba(76,139,245,0.06)";
+          }
+          return (
+            <button
+              key={i}
+              disabled={submitted}
+              onClick={() => toggle(i)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                textAlign: "left",
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: T.ink,
+                padding: "10px 14px",
+                borderRadius: 7,
+                border: `1.5px solid ${borderColor}`,
+                background: bg,
+                cursor: submitted ? "default" : "pointer",
+                lineHeight: 1.4,
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 4,
+                  border: `1.5px solid ${isSelected ? T.wire : T.inkSoft}`,
+                  background: isSelected ? T.wire : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {isSelected && <CheckCircle2 size={11} color="#fff" strokeWidth={3} />}
+              </div>
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      {!submitted ? (
+        <button
+          disabled={selected.size === 0}
+          onClick={handleCheck}
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            padding: "9px 18px",
+            borderRadius: 7,
+            border: "none",
+            background: selected.size > 0 ? T.copper : "#D8D2BE",
+            color: "#fff",
+            cursor: selected.size > 0 ? "pointer" : "not-allowed",
+          }}
+        >
+          Check my answer
+        </button>
+      ) : (
+        <div
+          style={{
+            fontFamily: FONTS.display,
+            fontWeight: 600,
+            fontSize: 14,
+            color: wasCorrect ? T.signal : "#B5523F",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <CheckCircle2 size={16} />
+          {wasCorrect ? "Correct." : "Not quite — correct options are highlighted above."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SingleChoicePart({ prompt, options, correct, explain, solved, onSolved }) {
+  const [selected, setSelected] = useState(null);
+  const [submitted, setSubmitted] = useState(!!solved);
+  const isCorrect = selected === correct;
+
+  const handleCheck = () => {
+    setSubmitted(true);
+    if (selected === correct) onSolved();
+  };
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 18, minWidth: 0 }}>
+      <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: T.ink, lineHeight: 1.6, margin: "0 0 16px 0" }}>{prompt}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+        {options.map((opt, oi) => {
+          const isSelected = selected === oi;
+          const isCorrectOpt = oi === correct;
+          let borderColor = T.parchmentDim;
+          let bg = "transparent";
+          if (submitted) {
+            if (isCorrectOpt) {
+              borderColor = T.signal;
+              bg = "rgba(76,175,109,0.08)";
+            } else if (isSelected) {
+              borderColor = "#D1554A";
+              bg = "rgba(209,85,74,0.06)";
+            }
+          } else if (isSelected) {
+            borderColor = T.wire;
+            bg = "rgba(76,139,245,0.06)";
+          }
+          return (
+            <button
+              key={oi}
+              disabled={submitted}
+              onClick={() => setSelected(oi)}
+              style={{
+                textAlign: "left",
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: T.ink,
+                padding: "10px 14px",
+                borderRadius: 7,
+                border: `1.5px solid ${borderColor}`,
+                background: bg,
+                cursor: submitted ? "default" : "pointer",
+                lineHeight: 1.4,
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      {!submitted ? (
+        <button
+          disabled={selected === null}
+          onClick={handleCheck}
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            padding: "9px 18px",
+            borderRadius: 7,
+            border: "none",
+            background: selected !== null ? T.copper : "#D8D2BE",
+            color: "#fff",
+            cursor: selected !== null ? "pointer" : "not-allowed",
+          }}
+        >
+          Check my answer
+        </button>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            fontFamily: FONTS.body,
+            fontSize: 14,
+            color: T.ink,
+            borderLeft: `2.5px solid ${isCorrect ? T.signal : "#D1554A"}`,
+            paddingLeft: 14,
+          }}
+        >
+          <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 13.5, color: isCorrect ? T.signal : "#B5523F" }}>
+            {isCorrect ? "Correct." : "Not quite."}
+          </div>
+          <div style={{ lineHeight: 1.6 }}>{explain}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ---------- Lesson 1 content ----------
 function Lesson1({ savedScore, onQuizComplete }) {
   return (
@@ -2503,6 +2776,142 @@ function Lesson9({ savedScore, onQuizComplete }) {
   );
 }
 
+function CertificationTest({ savedScore, onQuizComplete }) {
+  const allDone = savedScore !== undefined;
+  const [patternsSolved, setPatternsSolved] = useState(allDone);
+  const [flowSolved, setFlowSolved] = useState(allDone);
+  const [toolSolved, setToolSolved] = useState(allDone);
+  const [errorSolved, setErrorSolved] = useState(allDone);
+  const reported = React.useRef(allDone);
+
+  const parts = [patternsSolved, flowSolved, toolSolved, errorSolved];
+  const doneCount = parts.filter(Boolean).length;
+  const passed = doneCount === 4;
+
+  useEffect(() => {
+    if (passed && !reported.current) {
+      reported.current = true;
+      onQuizComplete(4);
+    }
+  }, [passed]);
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        CERTIFICATION — THE MILESTONE CHECK
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        From plain language to a build-ready plan
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>
+        {doneCount} / 4 parts passed
+      </div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 24,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          What this mirrors
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          The guide's actual milestone check: going from a client's plain-language description of a manual
+          task to a correct trigger/actions/conditions plan. One scenario, four parts. No hints beyond what
+          you've already learned.
+        </p>
+      </div>
+
+      <div
+        style={{
+          background: T.graphite,
+          borderRadius: 8,
+          padding: "20px 22px",
+          marginBottom: 30,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 10, textTransform: "uppercase" }}>
+          The client's request
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: "#EFEAD9", margin: 0, lineHeight: 1.75 }}>{CERT_BRIEF}</p>
+      </div>
+
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, marginBottom: 8, letterSpacing: 0.4 }}>PART 1 · PATTERN ID</div>
+      <MultiSelectQuestion
+        prompt="Which pattern(s) does this request map to?"
+        options={CERT_PATTERN_OPTIONS}
+        correctSet={CERT_PATTERN_CORRECT}
+        solved={patternsSolved}
+        onSolved={() => setPatternsSolved(true)}
+      />
+
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, margin: "10px 0 8px 0", letterSpacing: 0.4 }}>PART 2 · THE PLAN</div>
+      <FlowExercise exercise={CERT_FLOW_EXERCISE} solved={flowSolved} onSolved={() => setFlowSolved(true)} />
+
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, margin: "10px 0 8px 0", letterSpacing: 0.4 }}>PART 3 · TOOL CHOICE</div>
+      <SingleChoicePart
+        prompt="Which tool would you recommend for this job?"
+        options={CERT_TOOL_OPTIONS}
+        correct={CERT_TOOL_CORRECT}
+        explain={CERT_TOOL_EXPLAIN}
+        solved={toolSolved}
+        onSolved={() => setToolSolved(true)}
+      />
+
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, margin: "10px 0 8px 0", letterSpacing: 0.4 }}>PART 4 · ERROR HANDLING</div>
+      <MultiSelectQuestion
+        prompt="Which failure points does this specific scenario call for you to build around?"
+        options={CERT_ERROR_OPTIONS}
+        correctSet={CERT_ERROR_CORRECT}
+        solved={errorSolved}
+        onSolved={() => setErrorSolved(true)}
+      />
+
+      {passed && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #1E2229 0%, #2C313A 100%)",
+            borderRadius: 12,
+            padding: "34px 32px",
+            textAlign: "center",
+            marginTop: 12,
+            border: `1px solid ${T.copper}`,
+          }}
+        >
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              background: T.copper,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px auto",
+            }}
+          >
+            <Award size={26} color="#fff" />
+          </div>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 1, color: T.copper, marginBottom: 8, textTransform: "uppercase" }}>
+            Milestone check passed
+          </div>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 22, color: "#fff", marginBottom: 10 }}>
+            You can take a plain-language client request and turn it into a real, correct build plan.
+          </div>
+          <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: "#C8C2AE", maxWidth: 480, margin: "0 auto", lineHeight: 1.6 }}>
+            That's the whole point of Mode A. From here, the actual tools — Make.com and n8n — are just the
+            interface for a plan you already know how to make.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- App shell ----------
 export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -2580,7 +2989,7 @@ export default function App() {
                   textAlign: "left",
                 }}
               >
-                <LessonBadge n={l.id} state={state} />
+                <LessonBadge n={l.id} state={state} isCert={l.isCert} />
                 <div>
                   <div
                     style={{
@@ -2677,6 +3086,12 @@ export default function App() {
           <Lesson9
             savedScore={completed[9]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 9: score }))}
+          />
+        )}
+        {activeLesson === 10 && (
+          <CertificationTest
+            savedScore={completed[10]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 10: score }))}
           />
         )}
       </div>
