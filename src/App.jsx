@@ -3149,7 +3149,16 @@ function ModeBPlan() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: buildDescription(extra) }),
       });
-      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const errBody = await res.json();
+          detail = errBody?.debug || errBody?.error || "";
+        } catch {
+          // response wasn't JSON — ignore, we'll show the generic message
+        }
+        throw new Error(`Request failed (${res.status})${detail ? `: ${detail}` : ""}`);
+      }
       const data = await res.json();
       if (data.needsClarification) {
         setClarifyingQuestions(data.clarifyingQuestions || []);
