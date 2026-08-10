@@ -1,0 +1,112 @@
+// Worker entry point for the unified Workers Builds pipeline (wrangler deploy).
+// Handles /api/plan itself, and falls through to serving the built static site
+// (the ASSETS binding, pointed at ./dist) for everything else.
+//
+// Prototype tier: runs on Workers AI (env.AI, bound via wrangler.jsonc — no API key
+// needed for this). Swap to the real Claude API later by replacing only the model-call
+// section inside handlePlan(); the request/response shape the frontend expects stays the same.
+
+const SYSTEM_PROMPT = `You are an automation-planning assistant helping a freelancer turn a small-business client's plain-language request into a build-ready automation plan for Make.com or n8n.
+
+THE FIVE PATTERNS (nearly every request is one of these, or a combination of two):
+1. Lead capture & notification — new form/entry -> add to CRM/Sheet -> notify via Slack/email
+2. Scheduled data sync / reporting — timer -> pull data from a source -> compile into a report/sheet
+3. Conditional routing — trigger -> router/IF -> different paths based on a condition
+4. AI-enhanced step — trigger -> LLM node classifies/summarizes/drafts -> action
+5. Multi-step approval/confirmation chain — trigger -> create record -> notify -> confirmation, several downstream actions
+
+TRIGGER TYPE: Use "webhook" if the source app can push an instant notification (most modern form tools, CRMs, and SaaS apps support this). Use "polling" only if the source app has no webhook support, or the request is explicitly time-based (e.g. "every morning").
+
+TOOL CHOICE: Recommend "Make.com" by default — it needs no hosting/server setup, which is right for most small-business jobs. Recommend "n8n" only if the request explicitly needs self-hosting or custom code/complex logic beyond what a visual builder handles.
+
+ERROR HANDLING: Suggest 1-3 specific, concrete error-handling considerations for THIS workflow (not generic filler) — draw from: a fallback/error notification path, a required-field check for data that's often missing, duplicate-trigger awareness, or rate-limit pacing for high-volume workflows. Only include what's actually relevant to the scenario described.
+
+If the description is missing information you genuinely need (no idea what should trigger it, or what "done" looks like, or which apps are involved), respond with a clarification request instead of guessing. Ask for at most 3 specific missing things — do not re-ask for anything already provided.
+
+Respond with ONLY a single valid JSON object, no markdown code fences, no text outside the JSON. Use exactly this shape:
+
+If information is missing:
+{"needsClarification": true, "clarifyingQuestions": ["...", "..."]}
+
+If you have enough to plan:
+{
+  "needsClarification": false,
+  "patterns": ["Lead capture & notification"],
+  "patternExplanation": "One sentence on why this pattern (or combination) fits.",
+  "tool": "Make.com",
+  "toolReason": "One sentence.",
+  "trigger": {"description": "New Typeform response", "type": "webhook", "reason": "One sentence."},
+  "actions": [
+    {"step": "Add row to Google Sheet", "dataMapping": "Map the respondent's email and answers into the matching columns."},
+    {"step": "Notify assistant via Slack", "dataMapping": "Include the respondent's name and summary in the message text."}
+  ],
+  "conditions": [],
+  "errorHandling": ["A fallback path that notifies you if the Slack message fails to send."],
+  "edgeCase": "Test with a form submission that has a blank optional field."
+}
+
+If there IS a conditional branch, include exactly one object in "conditions": {"logic": "Deal value over $1,000?", "pathIfTrue": "Notify sales manager directly", "pathIfFalse": "Add to standard follow-up queue"}. If there's no branching, "conditions" must be an empty array.`;
+
+async function handlePlan(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const description = (body?.description || "").trim();
+  if (!description) {
+    return Response.json({ error: "Missing description." }, { status: 400 });
+  }
+
+  if (!env.AI) {
+    return Response.json(
+      { error: "Workers AI isn't connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const aiResponse = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Client's request:\n\n${description}` },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1200,
+    });
+
+    const raw = aiResponse?.response ?? aiResponse;
+    const text = typeof raw === "string" ? raw : JSON.stringify(raw);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        parsed = JSON.parse(match[0]);
+      } else {
+        throw new Error("Model did not return valid JSON.");
+      }
+    }
+
+    return Response.json(parsed);
+  } catch (err) {
+    return Response.json({ error: "The planning model couldn't produce a result. Try rephrasing or try again." }, { status: 502 });
+  }
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/api/plan" && request.method === "POST") {
+      return handlePlan(request, env);
+    }
+
+    // Everything else: serve the built static site.
+    return env.ASSETS.fetch(request);
+  },
+};
