@@ -1517,6 +1517,52 @@ function QAChecklist({ items }) {
 }
 
 
+function FlowChain({ trigger, preActions = [], condition, pathALabel = "If yes", pathA = [], pathBLabel = "If no", pathB = [] }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+        <FlowBox label={trigger} kind="trigger" />
+        {preActions.map((a, i) => (
+          <React.Fragment key={i}>
+            <Arrow />
+            <FlowBox label={a} kind="action" />
+          </React.Fragment>
+        ))}
+        {condition && (
+          <>
+            <Arrow />
+            <ConditionDiamond />
+          </>
+        )}
+      </div>
+
+      {condition && (
+        <>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: T.signal, margin: "6px 0 12px 0" }}>{condition}</div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>{pathALabel}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {pathA.map((a, i) => (
+                  <FlowBox key={i} label={a} kind="action" />
+                ))}
+              </div>
+            </div>
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>{pathBLabel}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {pathB.map((a, i) => (
+                  <FlowBox key={i} label={a} kind="action" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WorkedExample({ index, example }) {
   const { pattern, before, after } = example;
   return (
@@ -1548,45 +1594,7 @@ function WorkedExample({ index, example }) {
           <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 0.6, color: T.wire, marginBottom: 12, textTransform: "uppercase" }}>
             After — automated
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
-            <FlowBox label={after.trigger} kind="trigger" />
-            {after.preActions.map((a, i) => (
-              <React.Fragment key={i}>
-                <Arrow />
-                <FlowBox label={a} kind="action" />
-              </React.Fragment>
-            ))}
-            {after.condition && (
-              <>
-                <Arrow />
-                <ConditionDiamond />
-              </>
-            )}
-          </div>
-
-          {after.condition && (
-            <>
-              <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: T.signal, margin: "6px 0 12px 0" }}>{after.condition}</div>
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 140px", minWidth: 0 }}>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>If yes</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {after.pathA.map((a, i) => (
-                      <FlowBox key={i} label={a} kind="action" />
-                    ))}
-                  </div>
-                </div>
-                <div style={{ flex: "1 1 140px", minWidth: 0 }}>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>If no</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {after.pathB.map((a, i) => (
-                      <FlowBox key={i} label={a} kind="action" />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+          <FlowChain trigger={after.trigger} preActions={after.preActions} condition={after.condition} pathA={after.pathA} pathB={after.pathB} />
         </div>
       </div>
     </div>
@@ -2913,7 +2921,7 @@ function CertificationTest({ savedScore, onQuizComplete }) {
 }
 
 // ---------- App shell ----------
-export default function App() {
+function ModeALearn() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeLesson, setActiveLesson] = useState(1);
   const [completed, setCompleted] = useState({});
@@ -2943,7 +2951,8 @@ export default function App() {
     <div
       style={{
         display: "flex",
-        minHeight: "100vh",
+        height: "100%",
+        minHeight: 0,
         background: T.graphite,
         fontFamily: FONTS.body,
       }}
@@ -3097,6 +3106,375 @@ export default function App() {
       </div>
 
       <GlossaryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </div>
+  );
+}
+
+// ---------- Mode B: Plan a real client job ----------
+const INTAKE_FIELDS = [
+  { key: "apps", label: "Which specific apps/tools are involved?", placeholder: "e.g. Google Forms, Gmail, Slack, Airtable" },
+  { key: "trigger", label: "What should trigger the automation?", placeholder: "e.g. a new form entry, a new email, a specific time of day" },
+  { key: "doneLooks", label: 'What should happen at the end — what does "done" look like?', placeholder: "e.g. a Slack message is sent and the row is added" },
+  { key: "hasAccount", label: "Do they already have a free Make.com or n8n account, or need help setting one up?", placeholder: "e.g. they have Make.com already" },
+];
+
+function ModeBPlan() {
+  const [rawText, setRawText] = useState("");
+  const [fields, setFields] = useState({ apps: "", trigger: "", doneLooks: "", hasAccount: "" });
+  const [status, setStatus] = useState("idle"); // idle | loading | clarify | result | error
+  const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
+  const [clarifyAnswer, setClarifyAnswer] = useState("");
+  const [result, setResult] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const setField = (key, val) => setFields((f) => ({ ...f, [key]: val }));
+
+  const buildDescription = (extra) => {
+    let desc = rawText.trim();
+    const details = Object.entries(fields)
+      .filter(([, v]) => v.trim())
+      .map(([k, v]) => `${INTAKE_FIELDS.find((f) => f.key === k)?.label || k}: ${v.trim()}`)
+      .join("\n");
+    if (details) desc += (desc ? "\n\n" : "") + "Additional details:\n" + details;
+    if (extra) desc += "\n\nFollow-up answers:\n" + extra;
+    return desc;
+  };
+
+  const callApi = async (extra) => {
+    setStatus("loading");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: buildDescription(extra) }),
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      if (data.needsClarification) {
+        setClarifyingQuestions(data.clarifyingQuestions || []);
+        setStatus("clarify");
+      } else {
+        setResult(data);
+        setStatus("result");
+      }
+    } catch (e) {
+      setErrorMsg(e.message || "Something went wrong reaching the planning service.");
+      setStatus("error");
+    }
+  };
+
+  const reset = () => {
+    setRawText("");
+    setFields({ apps: "", trigger: "", doneLooks: "", hasAccount: "" });
+    setStatus("idle");
+    setClarifyingQuestions([]);
+    setClarifyAnswer("");
+    setResult(null);
+    setErrorMsg("");
+  };
+
+  return (
+    <div style={{ minHeight: "100%", background: T.parchment, padding: "44px 56px" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+          MODE B · PLAN A REAL CLIENT JOB
+        </div>
+        <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 30, color: T.ink, margin: "0 0 10px 0", lineHeight: 1.15 }}>
+          Turn what a client told you into a build-ready plan
+        </h1>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15.5, color: T.inkSoft, lineHeight: 1.6, marginBottom: 30 }}>
+          Paste what they said, in their own words — messy is fine. Fill in anything below that isn't already
+          covered. This is currently running on a prototype model while the real thing gets wired up, so
+          treat the output as a rough draft, not gospel.
+        </p>
+
+        {(status === "idle" || status === "loading" || status === "error") && (
+          <>
+            <label style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              What the client said
+            </label>
+            <textarea
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+              placeholder='e.g. "Every time someone fills out our contact form I have to copy it into a spreadsheet and text my assistant..."'
+              rows={5}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                fontFamily: FONTS.body,
+                fontSize: 15,
+                color: T.ink,
+                padding: "12px 14px",
+                borderRadius: 8,
+                border: `1px solid ${T.parchmentDim}`,
+                background: "#fff",
+                marginTop: 8,
+                marginBottom: 22,
+                resize: "vertical",
+              }}
+            />
+
+            <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 12 }}>
+              Fill in anything not already covered above
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 26 }}>
+              {INTAKE_FIELDS.map((f) => (
+                <div key={f.key}>
+                  <label style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, display: "block", marginBottom: 5 }}>{f.label}</label>
+                  <input
+                    value={fields[f.key]}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    placeholder={f.placeholder}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      fontFamily: FONTS.body,
+                      fontSize: 14,
+                      color: T.ink,
+                      padding: "9px 12px",
+                      borderRadius: 7,
+                      border: `1px solid ${T.parchmentDim}`,
+                      background: "#fff",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {status === "error" && (
+              <div style={{ fontFamily: FONTS.body, fontSize: 14, color: "#B5523F", marginBottom: 16 }}>
+                {errorMsg} — try again in a moment.
+              </div>
+            )}
+
+            <button
+              disabled={status === "loading" || !rawText.trim()}
+              onClick={() => callApi()}
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 12.5,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                padding: "12px 24px",
+                borderRadius: 8,
+                border: "none",
+                background: status === "loading" || !rawText.trim() ? "#D8D2BE" : T.copper,
+                color: "#fff",
+                cursor: status === "loading" || !rawText.trim() ? "not-allowed" : "pointer",
+              }}
+            >
+              {status === "loading" ? "Generating plan…" : "Generate build plan"}
+            </button>
+          </>
+        )}
+
+        {status === "clarify" && (
+          <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px" }}>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 10, textTransform: "uppercase" }}>
+              A couple things are missing
+            </div>
+            <ul style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, lineHeight: 1.7, marginBottom: 16, paddingLeft: 20 }}>
+              {clarifyingQuestions.map((q, i) => (
+                <li key={i}>{q}</li>
+              ))}
+            </ul>
+            <textarea
+              value={clarifyAnswer}
+              onChange={(e) => setClarifyAnswer(e.target.value)}
+              rows={3}
+              placeholder="Answer here…"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: T.ink,
+                padding: "10px 12px",
+                borderRadius: 7,
+                border: `1px solid ${T.parchmentDim}`,
+                marginBottom: 14,
+                resize: "vertical",
+              }}
+            />
+            <button
+              disabled={!clarifyAnswer.trim()}
+              onClick={() => callApi(clarifyAnswer)}
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 12.5,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                padding: "10px 20px",
+                borderRadius: 7,
+                border: "none",
+                background: clarifyAnswer.trim() ? T.copper : "#D8D2BE",
+                color: "#fff",
+                cursor: clarifyAnswer.trim() ? "pointer" : "not-allowed",
+              }}
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {status === "result" && result && (
+          <div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {(result.patterns || []).map((p, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontFamily: FONTS.mono,
+                    fontSize: 11.5,
+                    color: T.wire,
+                    background: "rgba(76,139,245,0.1)",
+                    padding: "5px 12px",
+                    borderRadius: 20,
+                  }}
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+            <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, lineHeight: 1.6, marginBottom: 24 }}>{result.patternExplanation}</p>
+
+            <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 6, textTransform: "uppercase" }}>
+                Recommended tool
+              </div>
+              <div style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 18, color: T.ink, marginBottom: 6 }}>{result.tool}</div>
+              <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, margin: 0, lineHeight: 1.6 }}>{result.toolReason}</p>
+            </div>
+
+            <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "20px 22px", marginBottom: 16, minWidth: 0 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 4, textTransform: "uppercase" }}>
+                Trigger
+              </div>
+              <p style={{ fontFamily: FONTS.body, fontSize: 14, color: T.inkSoft, marginTop: 0, marginBottom: 14 }}>
+                {result.trigger?.type === "webhook" ? "Webhook — instant" : "Polling — checked on a schedule"}: {result.trigger?.reason}
+              </p>
+              <FlowChain
+                trigger={result.trigger?.description || "Trigger"}
+                preActions={(result.actions || []).map((a) => a.step)}
+                condition={result.conditions?.[0]?.logic}
+                pathA={result.conditions?.[0] ? [result.conditions[0].pathIfTrue] : []}
+                pathB={result.conditions?.[0] ? [result.conditions[0].pathIfFalse] : []}
+              />
+            </div>
+
+            {result.actions?.some((a) => a.dataMapping) && (
+              <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 10, textTransform: "uppercase" }}>
+                  Data mapping notes
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {result.actions.filter((a) => a.dataMapping).map((a, i) => (
+                    <div key={i} style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, lineHeight: 1.5 }}>
+                      <strong>{a.step}:</strong> {a.dataMapping}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ background: T.parchmentDim, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 10, textTransform: "uppercase" }}>
+                Error-handling to build in
+              </div>
+              <ul style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, lineHeight: 1.7, margin: 0, paddingLeft: 20 }}>
+                {(result.errorHandling || []).map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              style={{
+                background: "rgba(76,175,109,0.08)",
+                borderLeft: `3px solid ${T.signal}`,
+                borderRadius: "0 8px 8px 0",
+                padding: "14px 18px",
+                marginBottom: 26,
+              }}
+            >
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.signal, marginBottom: 6, textTransform: "uppercase" }}>
+                Edge case worth testing
+              </div>
+              <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, margin: 0, lineHeight: 1.6 }}>{result.edgeCase}</p>
+            </div>
+
+            <button
+              onClick={reset}
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 12,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                padding: "9px 18px",
+                borderRadius: 7,
+                border: `1px solid ${T.parchmentDim}`,
+                background: "transparent",
+                color: T.inkSoft,
+                cursor: "pointer",
+              }}
+            >
+              Plan another job
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+function TopModeSwitcher({ mode, setMode }) {
+  const tabStyle = (active) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "8px 16px",
+    borderRadius: 7,
+    border: "none",
+    background: active ? T.copper : "transparent",
+    color: active ? "#fff" : "#9AA0AC",
+    fontFamily: FONTS.mono,
+    fontSize: 12,
+    letterSpacing: 0.4,
+    cursor: "pointer",
+  });
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 16px",
+        background: "#15181D",
+        borderBottom: `1px solid ${T.graphiteLine}`,
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 13.5, color: "#fff", marginRight: 10 }}>
+        Automation Fundamentals
+      </div>
+      <button onClick={() => setMode("learn")} style={tabStyle(mode === "learn")}>
+        <BookOpen size={13} /> Learn
+      </button>
+      <button onClick={() => setMode("plan")} style={tabStyle(mode === "plan")}>
+        <Radio size={13} /> Plan a client job
+      </button>
+    </div>
+  );
+}
+
+export default function App() {
+  const [mode, setMode] = useState("learn");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <TopModeSwitcher mode={mode} setMode={setMode} />
+      <div style={{ flex: 1, minHeight: 0 }}>{mode === "learn" ? <ModeALearn /> : <ModeBPlan />}</div>
     </div>
   );
 }
