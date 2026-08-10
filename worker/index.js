@@ -94,7 +94,8 @@ async function handlePlan(request, env) {
 
     return Response.json(parsed);
   } catch (err) {
-    return Response.json({ error: "The planning model couldn't produce a result. Try rephrasing or try again." }, { status: 502 });
+    // TEMP: surfacing the real error while we debug — revert to a generic message once this works.
+    return Response.json({ error: "The planning model couldn't produce a result.", debug: String(err?.message || err) }, { status: 502 });
   }
 }
 
