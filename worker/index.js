@@ -54,7 +54,7 @@ If you have enough to plan:
   "edgeCase": "Test with a form submission that has a blank optional field."
 }
 
-If there IS a conditional branch, include exactly one object in "conditions": {"logic": "Deal value over $1,000?", "pathIfTrue": "Notify sales manager directly", "pathIfFalse": "Add to standard follow-up queue"}. If there's no branching, "conditions" must be an empty array.`;
+If there IS a conditional branch, include exactly one object in "conditions": {"logic": "Deal value over $1,000?", "pathIfTrue": "Notify sales manager directly", "pathIfFalse": "Add to standard follow-up queue"}. If there's no branching, "conditions" must be an empty array. "pathIfTrue" and "pathIfFalse" must NEVER be empty strings — always describe a concrete action for each outcome, even briefly. An empty or missing path is worse than a guess.`;
 
 // Cloudflare deprecates Workers AI models over time without much notice. Rather than depend
 // on one hardcoded ID, we try a short list of currently-active, Cloudflare-"pinned" models in
@@ -67,14 +67,14 @@ const MODEL_CANDIDATES = [
   "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 ];
 
-async function runWithFallback(env, messages) {
+async function runWithFallback(env, messages, { jsonMode = true, maxTokens = 1200 } = {}) {
   const attempts = [];
   for (const model of MODEL_CANDIDATES) {
     try {
       const result = await env.AI.run(model, {
         messages,
-        response_format: { type: "json_object" },
-        max_tokens: 1200,
+        ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        max_tokens: maxTokens,
       });
       return { result, modelUsed: model };
     } catch (err) {
