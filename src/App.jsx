@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Lock, CheckCircle2, X, BookOpen, Radio, Award, Printer } from "lucide-react";
+import { Lock, CheckCircle2, X, BookOpen, Radio, Award, Printer, Copy, FileText } from "lucide-react";
 
 // ---------- Design tokens ----------
 const T = {
@@ -3234,6 +3234,10 @@ function ModeBPlan() {
   const [clarifyAnswer, setClarifyAnswer] = useState("");
   const [result, setResult] = useState(null);
   const [submittedDescription, setSubmittedDescription] = useState("");
+  const [docStatus, setDocStatus] = useState("idle"); // idle | loading | result | error
+  const [docText, setDocText] = useState("");
+  const [docError, setDocError] = useState("");
+  const [docCopied, setDocCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const setField = (key, val) => setFields((f) => ({ ...f, [key]: val }));
@@ -3284,6 +3288,42 @@ function ModeBPlan() {
     }
   };
 
+  const generateDocumentation = async () => {
+    setDocStatus("loading");
+    setDocError("");
+    setDocCopied(false);
+    try {
+      const res = await fetch("/api/document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: result }),
+      });
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const errBody = await res.json();
+          detail = errBody?.error || "";
+        } catch {
+          // ignore, use generic message
+        }
+        throw new Error(detail || `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      setDocText(data.documentation || "");
+      setDocStatus("result");
+    } catch (e) {
+      setDocError(e.message || "Something went wrong generating the documentation.");
+      setDocStatus("error");
+    }
+  };
+
+  const copyDocToClipboard = () => {
+    navigator.clipboard.writeText(docText).then(() => {
+      setDocCopied(true);
+      setTimeout(() => setDocCopied(false), 2000);
+    });
+  };
+
   const reset = () => {
     setRawText("");
     setFields({ apps: "", trigger: "", doneLooks: "", hasAccount: "" });
@@ -3292,6 +3332,9 @@ function ModeBPlan() {
     setClarifyAnswer("");
     setResult(null);
     setErrorMsg("");
+    setDocStatus("idle");
+    setDocText("");
+    setDocError("");
   };
 
   return (
@@ -3565,6 +3608,78 @@ function ModeBPlan() {
                 Edge case worth testing
               </div>
               <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, margin: 0, lineHeight: 1.6 }}>{result.edgeCase}</p>
+            </div>
+
+            <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "20px 22px", marginBottom: 26, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: docStatus === "result" ? 14 : 0 }}>
+                <div>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.copper, marginBottom: 4, textTransform: "uppercase" }}>
+                    Client documentation
+                  </div>
+                  <p style={{ fontFamily: FONTS.body, fontSize: 13.5, color: T.inkSoft, margin: 0 }}>
+                    A plain-language explanation you can actually hand to the client — no jargon.
+                  </p>
+                </div>
+                {docStatus !== "result" && (
+                  <button
+                    className="no-print"
+                    disabled={docStatus === "loading"}
+                    onClick={generateDocumentation}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      fontFamily: FONTS.mono,
+                      fontSize: 11.5,
+                      letterSpacing: 0.4,
+                      textTransform: "uppercase",
+                      padding: "9px 16px",
+                      borderRadius: 7,
+                      border: "none",
+                      background: docStatus === "loading" ? "#D8D2BE" : T.copper,
+                      color: "#fff",
+                      cursor: docStatus === "loading" ? "not-allowed" : "pointer",
+                      flexShrink: 0,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <FileText size={14} /> {docStatus === "loading" ? "Generating…" : "Generate for client"}
+                  </button>
+                )}
+              </div>
+
+              {docStatus === "error" && (
+                <div style={{ fontFamily: FONTS.body, fontSize: 13.5, color: "#B5523F", marginTop: 10 }}>{docError} — try again.</div>
+              )}
+
+              {docStatus === "result" && (
+                <div>
+                  <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, lineHeight: 1.75, whiteSpace: "pre-wrap", margin: "0 0 14px 0" }}>
+                    {docText}
+                  </p>
+                  <button
+                    className="no-print"
+                    onClick={copyDocToClipboard}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontFamily: FONTS.mono,
+                      fontSize: 11,
+                      letterSpacing: 0.4,
+                      textTransform: "uppercase",
+                      padding: "7px 12px",
+                      borderRadius: 6,
+                      border: `1px solid ${T.parchmentDim}`,
+                      background: "transparent",
+                      color: T.inkSoft,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Copy size={12} /> {docCopied ? "Copied!" : "Copy to clipboard"}
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
