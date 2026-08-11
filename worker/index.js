@@ -47,6 +47,34 @@ If you have enough to plan:
 
 If there IS a conditional branch, include exactly one object in "conditions": {"logic": "Deal value over $1,000?", "pathIfTrue": "Notify sales manager directly", "pathIfFalse": "Add to standard follow-up queue"}. If there's no branching, "conditions" must be an empty array.`;
 
+// Cloudflare deprecates Workers AI models over time without much notice. Rather than depend
+// on one hardcoded ID, we try a short list of currently-active, Cloudflare-"pinned" models in
+// order — if one gets deprecated later, this just silently falls through to the next instead
+// of breaking Mode B outright. Update this list if the docs ever show all of them deprecated:
+// https://developers.cloudflare.com/workers-ai/models/ (filter: Text Generation)
+const MODEL_CANDIDATES = [
+  "@cf/meta/llama-4-scout-17b-16e-instruct",
+  "@cf/openai/gpt-oss-20b",
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+];
+
+async function runWithFallback(env, messages) {
+  const attempts = [];
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      const result = await env.AI.run(model, {
+        messages,
+        response_format: { type: "json_object" },
+        max_tokens: 1200,
+      });
+      return { result, modelUsed: model };
+    } catch (err) {
+      attempts.push(`${model}: ${err?.message || err}`);
+    }
+  }
+  throw new Error(`All candidate models failed — ${attempts.join(" | ")}`);
+}
+
 async function handlePlan(request, env) {
   let body;
   try {
@@ -68,14 +96,10 @@ async function handlePlan(request, env) {
   }
 
   try {
-    const aiResponse = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Client's request:\n\n${description}` },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1200,
-    });
+    const { result: aiResponse } = await runWithFallback(env, [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `Client's request:\n\n${description}` },
+    ]);
 
     const raw = aiResponse?.response ?? aiResponse;
     const text = typeof raw === "string" ? raw : JSON.stringify(raw);
@@ -94,7 +118,6 @@ async function handlePlan(request, env) {
 
     return Response.json(parsed);
   } catch (err) {
-    // TEMP: surfacing the real error while we debug — revert to a generic message once this works.
     return Response.json({ error: "The planning model couldn't produce a result.", debug: String(err?.message || err) }, { status: 502 });
   }
 }
