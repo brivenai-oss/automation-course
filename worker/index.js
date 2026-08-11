@@ -180,6 +180,73 @@ async function handleDocument(request, env) {
   }
 }
 
+const DEBUG_SYSTEM_PROMPT = `You are a debugging assistant helping a freelancer fix a broken step in a Make.com or n8n automation. They've described what the step is supposed to do and pasted the actual error message or symptom.
+
+Default to a Socratic style: ask ONE focused, specific guiding question tailored to their exact error and step — not a generic one — that would help narrow down the real cause, rather than immediately diagnosing it. Keep it to 1-2 sentences.
+
+Once the conversation has enough information — after they've answered a guiding question, or if they explicitly ask for the direct answer — give a clear, concrete diagnosis: the likely cause and a specific fix. Don't ask more than 1-2 guiding questions total before diagnosing; don't drag it out.
+
+If the user's most recent message asks for the direct answer, or says something like "skip ahead" or "just tell me", diagnose immediately instead of asking another question.
+
+Write conversationally, like you're actually talking to someone — a few sentences, no markdown headers, no bullet-point walls.
+
+Respond with ONLY a JSON object: {"type": "question", "message": "..."} when asking a guiding question, or {"type": "diagnosis", "message": "..."} when giving the actual answer.`;
+
+async function handleDebugChat(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const history = Array.isArray(body?.history)
+    ? body.history.filter((m) => m && typeof m.content === "string" && (m.role === "user" || m.role === "assistant"))
+    : [];
+  if (history.length === 0) {
+    return Response.json({ error: "Missing conversation." }, { status: 400 });
+  }
+
+  if (!env.AI) {
+    return Response.json(
+      { error: "Workers AI isn't connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const messages = [{ role: "system", content: DEBUG_SYSTEM_PROMPT }, ...history];
+    if (body?.skipToAnswer) {
+      messages.push({ role: "user", content: "Please give the direct diagnosis and fix now — skip any further guiding questions." });
+    }
+
+    const { result: aiResponse } = await runWithFallback(env, messages, { jsonMode: true, maxTokens: 500 });
+
+    const raw = aiResponse?.response ?? aiResponse;
+    const text = typeof raw === "string" ? raw : JSON.stringify(raw);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        parsed = JSON.parse(match[0]);
+      } else {
+        throw new Error("Model did not return valid JSON.");
+      }
+    }
+
+    const type = parsed?.type === "diagnosis" ? "diagnosis" : "question";
+    const message =
+      typeof parsed?.message === "string" && parsed.message.trim() ? parsed.message.trim() : "Could you share a bit more detail about what's happening?";
+
+    return Response.json({ type, message });
+  } catch (err) {
+    return Response.json({ error: "Couldn't get a response from the debugging assistant. Try again in a moment." }, { status: 502 });
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -190,6 +257,10 @@ export default {
 
     if (url.pathname === "/api/document" && request.method === "POST") {
       return handleDocument(request, env);
+    }
+
+    if (url.pathname === "/api/debug" && request.method === "POST") {
+      return handleDebugChat(request, env);
     }
 
     // Everything else: serve the built static site.
