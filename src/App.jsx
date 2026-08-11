@@ -3111,6 +3111,103 @@ function ModeALearn() {
 }
 
 // ---------- Mode B: Plan a real client job ----------
+
+// AI output shape can't be fully trusted — coerce every field to the type the
+// renderer expects so a malformed response degrades gracefully instead of crashing.
+function sanitizeResult(data) {
+  const conditionsRaw = Array.isArray(data?.conditions) ? data.conditions : [];
+  return {
+    patterns: Array.isArray(data?.patterns) ? data.patterns.filter((p) => typeof p === "string") : [],
+    patternExplanation: typeof data?.patternExplanation === "string" ? data.patternExplanation : "",
+    tool: typeof data?.tool === "string" && data.tool ? data.tool : "Not specified",
+    toolReason: typeof data?.toolReason === "string" ? data.toolReason : "",
+    trigger: {
+      description: typeof data?.trigger?.description === "string" ? data.trigger.description : "Trigger",
+      type: data?.trigger?.type === "polling" ? "polling" : "webhook",
+      reason: typeof data?.trigger?.reason === "string" ? data.trigger.reason : "",
+    },
+    actions: Array.isArray(data?.actions)
+      ? data.actions
+          .filter((a) => a && typeof a === "object")
+          .map((a) => ({
+            step: typeof a.step === "string" ? a.step : "Action",
+            dataMapping: typeof a.dataMapping === "string" ? a.dataMapping : "",
+          }))
+      : [],
+    conditions: conditionsRaw
+      .filter((c) => c && typeof c === "object")
+      .map((c) => ({
+        logic: typeof c.logic === "string" ? c.logic : "Condition",
+        pathIfTrue: typeof c.pathIfTrue === "string" ? c.pathIfTrue : "",
+        pathIfFalse: typeof c.pathIfFalse === "string" ? c.pathIfFalse : "",
+      })),
+    errorHandling: Array.isArray(data?.errorHandling) ? data.errorHandling.filter((e) => typeof e === "string") : [],
+    edgeCase: typeof data?.edgeCase === "string" ? data.edgeCase : "",
+    _raw: data,
+  };
+}
+
+class ResultErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    this.setState({ error });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ background: "#fff", border: "1px solid #D1554A", borderRadius: 10, padding: "22px 24px" }}>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 15, color: "#B5523F", marginBottom: 10 }}>
+            Something went wrong displaying this plan.
+          </div>
+          <p style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, marginBottom: 14, lineHeight: 1.6 }}>
+            The planning model returned something this page couldn't render cleanly. Here's the raw response —
+            paste this back if you want help debugging it:
+          </p>
+          <pre
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 11.5,
+              background: T.parchment,
+              padding: 14,
+              borderRadius: 6,
+              overflowX: "auto",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {JSON.stringify(this.props.rawResult, null, 2)}
+          </pre>
+          <button
+            onClick={this.props.onReset}
+            style={{
+              marginTop: 14,
+              fontFamily: FONTS.mono,
+              fontSize: 12,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+              padding: "9px 18px",
+              borderRadius: 7,
+              border: "none",
+              background: T.copper,
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Try another plan
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const INTAKE_FIELDS = [
   { key: "apps", label: "Which specific apps/tools are involved?", placeholder: "e.g. Google Forms, Gmail, Slack, Airtable" },
   { key: "trigger", label: "What should trigger the automation?", placeholder: "e.g. a new form entry, a new email, a specific time of day" },
@@ -3166,7 +3263,7 @@ function ModeBPlan() {
         setClarifyingQuestions(data.clarifyingQuestions || []);
         setStatus("clarify");
       } else {
-        setResult(data);
+        setResult(sanitizeResult(data));
         setSubmittedDescription(fullDescription);
         setStatus("result");
       }
@@ -3331,6 +3428,7 @@ function ModeBPlan() {
         )}
 
         {status === "result" && result && (
+          <ResultErrorBoundary rawResult={result._raw} onReset={reset}>
           <div>
             <div
               style={{
@@ -3477,6 +3575,7 @@ function ModeBPlan() {
               Plan another job
             </button>
           </div>
+          </ResultErrorBoundary>
         )}
       </div>
     </div>
