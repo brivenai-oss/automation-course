@@ -2,3 +2,12 @@
 html, body, #root { height: 100%; margin: 0; padding: 0; }
 body { -webkit-font-smoothing: antialiased; }
 button:focus-visible { outline: 2px solid #4C8BF5; outline-offset: 2px; }
+
+@media print {
+  .no-print { display: none !important; }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body { background: #fff !important; }
+}
