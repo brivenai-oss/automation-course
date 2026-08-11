@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Lock, CheckCircle2, X, BookOpen, Radio, Award } from "lucide-react";
+import { Lock, CheckCircle2, X, BookOpen, Radio, Award, Printer } from "lucide-react";
 
 // ---------- Design tokens ----------
 const T = {
@@ -3125,6 +3125,7 @@ function ModeBPlan() {
   const [clarifyingQuestions, setClarifyingQuestions] = useState([]);
   const [clarifyAnswer, setClarifyAnswer] = useState("");
   const [result, setResult] = useState(null);
+  const [submittedDescription, setSubmittedDescription] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
   const setField = (key, val) => setFields((f) => ({ ...f, [key]: val }));
@@ -3143,11 +3144,12 @@ function ModeBPlan() {
   const callApi = async (extra) => {
     setStatus("loading");
     setErrorMsg("");
+    const fullDescription = buildDescription(extra);
     try {
       const res = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: buildDescription(extra) }),
+        body: JSON.stringify({ description: fullDescription }),
       });
       if (!res.ok) {
         let detail = "";
@@ -3165,6 +3167,7 @@ function ModeBPlan() {
         setStatus("clarify");
       } else {
         setResult(data);
+        setSubmittedDescription(fullDescription);
         setStatus("result");
       }
     } catch (e) {
@@ -3329,6 +3332,48 @@ function ModeBPlan() {
 
         {status === "result" && result && (
           <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+                marginBottom: 22,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 0.6, color: T.inkSoft, marginBottom: 6, textTransform: "uppercase" }}>
+                  What was asked
+                </div>
+                <p style={{ fontFamily: FONTS.body, fontSize: 14, color: T.ink, lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>
+                  {submittedDescription}
+                </p>
+              </div>
+              <button
+                className="no-print"
+                onClick={() => window.print()}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  fontFamily: FONTS.mono,
+                  fontSize: 11.5,
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                  padding: "9px 16px",
+                  borderRadius: 7,
+                  border: `1px solid ${T.parchmentDim}`,
+                  background: "#fff",
+                  color: T.ink,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Printer size={14} /> Export / Save as PDF
+              </button>
+            </div>
+
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {(result.patterns || []).map((p, i) => (
                 <span
@@ -3414,6 +3459,7 @@ function ModeBPlan() {
             </div>
 
             <button
+              className="no-print"
               onClick={reset}
               style={{
                 fontFamily: FONTS.mono,
@@ -3455,6 +3501,7 @@ function TopModeSwitcher({ mode, setMode }) {
   });
   return (
     <div
+      className="no-print"
       style={{
         display: "flex",
         alignItems: "center",
