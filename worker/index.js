@@ -131,12 +131,65 @@ async function handlePlan(request, env) {
   }
 }
 
+// Straight from the guide's own copy-paste prompt template (Part 5.5), adapted for direct AI use
+// rather than a human pasting it manually.
+const DOCUMENT_SYSTEM_PROMPT = `You are helping a freelancer write client-facing documentation for an automation they just built.
+
+You will be given a build plan as JSON (trigger, actions, conditions, tool, error handling). Write a short, plain-language explanation — under 250 words — that a non-technical small-business client could read and understand. Cover exactly three things: what this automation does, what happens if something goes wrong, and who to contact for changes.
+
+Do not use technical jargon: no "webhook", "API", "node", "JSON", "trigger" (say "when X happens" instead), "conditional branch" (say "depending on whether..." instead), or platform names like Make.com/n8n unless naturally relevant. Write it the way you'd explain it out loud to a busy shop owner.
+
+Return ONLY the explanation text itself — no headers, no markdown formatting, no preamble like "Here's the documentation:", just the plain-language paragraphs a client would actually receive.`;
+
+async function handleDocument(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const plan = body?.plan;
+  if (!plan || typeof plan !== "object") {
+    return Response.json({ error: "Missing plan." }, { status: 400 });
+  }
+
+  if (!env.AI) {
+    return Response.json(
+      { error: "Workers AI isn't connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const { result: aiResponse } = await runWithFallback(
+      env,
+      [
+        { role: "system", content: DOCUMENT_SYSTEM_PROMPT },
+        { role: "user", content: `Automation plan:\n\n${JSON.stringify(plan, null, 2)}` },
+      ],
+      { jsonMode: false, maxTokens: 500 }
+    );
+
+    const text = (aiResponse?.response ?? aiResponse ?? "").toString().trim();
+    if (!text) throw new Error("Model returned an empty response.");
+
+    return Response.json({ documentation: text });
+  } catch (err) {
+    return Response.json({ error: "Couldn't generate documentation. Try again in a moment." }, { status: 502 });
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/plan" && request.method === "POST") {
       return handlePlan(request, env);
+    }
+
+    if (url.pathname === "/api/document" && request.method === "POST") {
+      return handleDocument(request, env);
     }
 
     // Everything else: serve the built static site.
