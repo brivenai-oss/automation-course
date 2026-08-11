@@ -17,6 +17,9 @@ THE FIVE PATTERNS (nearly every request is one of these, or a combination of two
 
 TRIGGER TYPE: Use "webhook" if the source app can push an instant notification (most modern form tools, CRMs, and SaaS apps support this). Use "polling" only if the source app has no webhook support, or the request is explicitly time-based (e.g. "every morning").
 
+IDENTIFYING THE TRUE TRIGGER: When a request describes multiple chained steps (e.g. "a new email arrives, gets logged in a sheet, then that triggers a Slack message"), the trigger is ONLY the single earliest originating event — never the result of your own first action. Do not set the trigger to something that one of your own listed actions creates (like "a new row is added"); that is circular. The row being added, the record being created, etc. are themselves actions, not triggers.
+Example — correct: "Log every new client email in a sheet, then notify Slack when one is added" -> trigger: "New client email received" -> actions: ["Parse the email and add a row to the spreadsheet with the sender's name and request", "Notify assistant via Slack that a new row was added"]. Note the trigger is the email arriving, NOT "a new row was added" — that would be circular since it's the direct output of the first action.
+
 TOOL CHOICE: Recommend "Make.com" by default — it needs no hosting/server setup, which is right for most small-business jobs. Recommend "n8n" only if the request explicitly needs self-hosting or custom code/complex logic beyond what a visual builder handles.
 
 ERROR HANDLING: Suggest 1-3 specific, concrete error-handling considerations for THIS workflow (not generic filler) — draw from: a fallback/error notification path, a required-field check for data that's often missing, duplicate-trigger awareness, or rate-limit pacing for high-volume workflows. Only include what's actually relevant to the scenario described.
