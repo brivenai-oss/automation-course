@@ -3708,6 +3708,357 @@ function ModeBPlan() {
   );
 }
 
+// ---------- Mode B: Debugging assistant ----------
+function DebugBubble({ msg }) {
+  const isUser = msg.role === "user";
+  const isDiagnosis = msg.displayAs === "diagnosis";
+  const isQuestion = msg.displayAs === "question";
+  const accent = isUser ? T.copper : isDiagnosis ? T.signal : T.wire;
+  const label = isUser ? "You" : isDiagnosis ? "Diagnosis" : "Guiding question";
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: `1.5px solid ${accent}`,
+        borderRadius: 10,
+        padding: "14px 18px",
+        marginBottom: 12,
+        maxWidth: 560,
+        marginLeft: isUser ? "auto" : 0,
+      }}
+    >
+      <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 0.5, color: accent, marginBottom: 6, textTransform: "uppercase" }}>
+        {label}
+      </div>
+      <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, margin: 0, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{msg.content}</p>
+    </div>
+  );
+}
+
+function ModeBDebug() {
+  const [stepDescription, setStepDescription] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [messages, setMessages] = useState([]); // {role, content, displayAs}
+  const [status, setStatus] = useState("idle"); // idle | loading | chatting | error
+  const [replyText, setReplyText] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const sendToApi = async (fullMessages, skipToAnswer) => {
+    setStatus("loading");
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/debug", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          history: fullMessages.map((m) => ({ role: m.role, content: m.content })),
+          skipToAnswer: !!skipToAnswer,
+        }),
+      });
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const errBody = await res.json();
+          detail = errBody?.error || "";
+        } catch {
+          // ignore
+        }
+        throw new Error(detail || `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+      setMessages([...fullMessages, { role: "assistant", content: data.message, displayAs: data.type }]);
+      setStatus("chatting");
+    } catch (e) {
+      setErrorMsg(e.message || "Something went wrong reaching the debugging assistant.");
+      setStatus("error");
+    }
+  };
+
+  const start = (skip) => {
+    const seedContent = `Step description: ${stepDescription.trim() || "(not provided)"}\nError message: ${errorMessage.trim()}`;
+    const seedMsg = { role: "user", content: seedContent, displayAs: "seed" };
+    setMessages([seedMsg]);
+    sendToApi([seedMsg], skip);
+  };
+
+  const sendReply = () => {
+    if (!replyText.trim()) return;
+    const replyMsg = { role: "user", content: replyText.trim(), displayAs: "reply" };
+    const next = [...messages, replyMsg];
+    setMessages(next);
+    setReplyText("");
+    sendToApi(next, false);
+  };
+
+  const skipNow = () => {
+    if (messages.length === 0) {
+      start(true);
+    } else {
+      sendToApi(messages, true);
+    }
+  };
+
+  const reset = () => {
+    setStepDescription("");
+    setErrorMessage("");
+    setMessages([]);
+    setStatus("idle");
+    setReplyText("");
+    setErrorMsg("");
+  };
+
+  const lastMsg = messages[messages.length - 1];
+  const awaitingReply = status === "chatting" && lastMsg?.role === "assistant";
+
+  return (
+    <div style={{ minHeight: "100%", background: T.parchment, padding: "44px 56px" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+          MODE B · DEBUGGING ASSISTANT
+        </div>
+        <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 28, color: T.ink, margin: "0 0 10px 0", lineHeight: 1.15 }}>
+          Diagnose a broken step
+        </h1>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, lineHeight: 1.6, marginBottom: 28 }}>
+          Paste the actual error (or what's going wrong) and what the step is supposed to do. This defaults
+          to asking a guiding question first, the same reflex from the Error Handling lesson — skip ahead any
+          time if you just need the answer.
+        </p>
+
+        {messages.length === 0 && (
+          <>
+            <label style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              What is this step supposed to do?
+            </label>
+            <textarea
+              value={stepDescription}
+              onChange={(e) => setStepDescription(e.target.value)}
+              placeholder={'e.g. "Send a Slack message with the new lead\'s name and email"'}
+              rows={2}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: T.ink,
+                padding: "10px 12px",
+                borderRadius: 7,
+                border: `1px solid ${T.parchmentDim}`,
+                background: "#fff",
+                marginTop: 8,
+                marginBottom: 18,
+                resize: "vertical",
+              }}
+            />
+
+            <label style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              Paste the actual error / what's happening
+            </label>
+            <textarea
+              value={errorMessage}
+              onChange={(e) => setErrorMessage(e.target.value)}
+              placeholder={'e.g. "The Slack message goes out but it\'s always blank"'}
+              rows={3}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                fontFamily: FONTS.body,
+                fontSize: 14.5,
+                color: T.ink,
+                padding: "10px 12px",
+                borderRadius: 7,
+                border: `1px solid ${T.parchmentDim}`,
+                background: "#fff",
+                marginTop: 8,
+                marginBottom: 22,
+                resize: "vertical",
+              }}
+            />
+
+            {status === "error" && (
+              <div style={{ fontFamily: FONTS.body, fontSize: 14, color: "#B5523F", marginBottom: 16 }}>{errorMsg} — try again.</div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+              <button
+                disabled={status === "loading" || !errorMessage.trim()}
+                onClick={() => start(false)}
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 12.5,
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  padding: "12px 22px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: status === "loading" || !errorMessage.trim() ? "#D8D2BE" : T.copper,
+                  color: "#fff",
+                  cursor: status === "loading" || !errorMessage.trim() ? "not-allowed" : "pointer",
+                }}
+              >
+                {status === "loading" ? "Thinking…" : "Get help"}
+              </button>
+              <button
+                disabled={status === "loading" || !errorMessage.trim()}
+                onClick={skipNow}
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 12,
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                  padding: "10px 4px",
+                  border: "none",
+                  background: "transparent",
+                  color: !errorMessage.trim() ? "#B9B29A" : T.inkSoft,
+                  textDecoration: "underline",
+                  cursor: status === "loading" || !errorMessage.trim() ? "not-allowed" : "pointer",
+                }}
+              >
+                Skip straight to the answer
+              </button>
+            </div>
+          </>
+        )}
+
+        {messages.length > 0 && (
+          <div>
+            <div style={{ background: T.parchmentDim, borderRadius: 8, padding: "12px 16px", marginBottom: 18 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: 0.5, color: T.inkSoft, marginBottom: 4, textTransform: "uppercase" }}>
+                What you reported
+              </div>
+              <p style={{ fontFamily: FONTS.body, fontSize: 13.5, color: T.ink, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                {messages[0].content}
+              </p>
+            </div>
+
+            {messages.slice(1).map((m, i) => (
+              <DebugBubble key={i} msg={m} />
+            ))}
+
+            {status === "loading" && (
+              <p style={{ fontFamily: FONTS.body, fontSize: 13.5, color: T.inkSoft, fontStyle: "italic" }}>Thinking…</p>
+            )}
+
+            {status === "error" && (
+              <div style={{ fontFamily: FONTS.body, fontSize: 14, color: "#B5523F", marginBottom: 16 }}>{errorMsg} — try again.</div>
+            )}
+
+            {awaitingReply && (
+              <div style={{ marginTop: 8 }}>
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={lastMsg.displayAs === "diagnosis" ? "Still stuck? Reply here to keep digging…" : "Your answer…"}
+                  rows={2}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    fontFamily: FONTS.body,
+                    fontSize: 14.5,
+                    color: T.ink,
+                    padding: "10px 12px",
+                    borderRadius: 7,
+                    border: `1px solid ${T.parchmentDim}`,
+                    marginBottom: 12,
+                    resize: "vertical",
+                  }}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                  <button
+                    disabled={!replyText.trim()}
+                    onClick={sendReply}
+                    style={{
+                      fontFamily: FONTS.mono,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                      textTransform: "uppercase",
+                      padding: "9px 18px",
+                      borderRadius: 7,
+                      border: "none",
+                      background: replyText.trim() ? T.copper : "#D8D2BE",
+                      color: "#fff",
+                      cursor: replyText.trim() ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    Send
+                  </button>
+                  {lastMsg.displayAs === "question" && (
+                    <button
+                      onClick={skipNow}
+                      style={{
+                        fontFamily: FONTS.mono,
+                        fontSize: 11.5,
+                        letterSpacing: 0.4,
+                        textTransform: "uppercase",
+                        border: "none",
+                        background: "transparent",
+                        color: T.inkSoft,
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Just give me the answer
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={reset}
+              style={{
+                marginTop: 20,
+                fontFamily: FONTS.mono,
+                fontSize: 12,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                padding: "9px 18px",
+                borderRadius: 7,
+                border: `1px solid ${T.parchmentDim}`,
+                background: "transparent",
+                color: T.inkSoft,
+                cursor: "pointer",
+              }}
+            >
+              Start over
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Mode B wrapper: planner + debugging assistant sub-tabs ----------
+function ModeB() {
+  const [tab, setTab] = useState("plan");
+  const tabStyle = (active) => ({
+    fontFamily: FONTS.mono,
+    fontSize: 11.5,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    padding: "8px 14px",
+    borderRadius: 7,
+    border: "none",
+    background: active ? "rgba(76,139,245,0.12)" : "transparent",
+    color: active ? T.wire : T.inkSoft,
+    cursor: "pointer",
+  });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <div className="no-print" style={{ display: "flex", gap: 6, padding: "10px 20px", background: T.parchment, borderBottom: `1px solid ${T.parchmentDim}` }}>
+        <button onClick={() => setTab("plan")} style={tabStyle(tab === "plan")}>
+          Plan a job
+        </button>
+        <button onClick={() => setTab("debug")} style={tabStyle(tab === "debug")}>
+          Debug an error
+        </button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>{tab === "plan" ? <ModeBPlan /> : <ModeBDebug />}</div>
+    </div>
+  );
+}
+
 
 function TopModeSwitcher({ mode, setMode }) {
   const tabStyle = (active) => ({
@@ -3755,7 +4106,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <TopModeSwitcher mode={mode} setMode={setMode} />
-      <div style={{ flex: 1, minHeight: 0 }}>{mode === "learn" ? <ModeALearn /> : <ModeBPlan />}</div>
+      <div style={{ flex: 1, minHeight: 0 }}>{mode === "learn" ? <ModeALearn /> : <ModeB />}</div>
     </div>
   );
 }
