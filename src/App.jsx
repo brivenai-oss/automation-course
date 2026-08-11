@@ -1044,7 +1044,18 @@ function FlowBox({ label, kind, onRemove }) {
         minWidth: 0,
       }}
     >
-      <span style={{ fontFamily: FONTS.mono, fontSize: 12.5, color: colors[kind], overflowWrap: "break-word", minWidth: 0 }}>{label}</span>
+      <span
+        style={{
+          fontFamily: FONTS.mono,
+          fontSize: 12.5,
+          color: label ? colors[kind] : "#B5523F",
+          fontStyle: label ? "normal" : "italic",
+          overflowWrap: "break-word",
+          minWidth: 0,
+        }}
+      >
+        {label || "(not specified — model left this blank)"}
+      </span>
       {onRemove && (
         <button
           onClick={onRemove}
