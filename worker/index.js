@@ -1,10 +1,13 @@
 // Worker entry point for the unified Workers Builds pipeline (wrangler deploy).
-// Handles /api/plan itself, and falls through to serving the built static site
-// (the ASSETS binding, pointed at ./dist) for everything else.
+// Handles /api/plan, /api/document, /api/debug, and falls through to serving the
+// built static site (the ASSETS binding, pointed at ./dist) for everything else.
 //
-// Prototype tier: runs on Workers AI (env.AI, bound via wrangler.jsonc — no API key
-// needed for this). Swap to the real Claude API later by replacing only the model-call
-// section inside handlePlan(); the request/response shape the frontend expects stays the same.
+// MODEL PROVIDER: every handler below calls the single callModel() function instead
+// of talking to Workers AI directly. callModel() checks whether an ANTHROPIC_API_KEY
+// secret exists in the environment — if it does, it calls the real Claude API; if not,
+// it falls back to the free Workers AI prototype tier. Switching to Claude later is
+// therefore just adding one secret in the Cloudflare dashboard (Settings > Variables
+// and Secrets) — no code change or redeploy needed at that moment.
 
 const SYSTEM_PROMPT = `You are an automation-planning assistant helping a freelancer turn a small-business client's plain-language request into a build-ready automation plan for Make.com or n8n.
 
@@ -56,33 +59,98 @@ If you have enough to plan:
 
 If there IS a conditional branch, include exactly one object in "conditions": {"logic": "Deal value over $1,000?", "pathIfTrue": "Notify sales manager directly", "pathIfFalse": "Add to standard follow-up queue"}. If there's no branching, "conditions" must be an empty array. "pathIfTrue" and "pathIfFalse" must NEVER be empty strings — always describe a concrete action for each outcome, even briefly. An empty or missing path is worse than a guess.`;
 
+// ---------- Model provider layer ----------
+
 // Cloudflare deprecates Workers AI models over time without much notice. Rather than depend
 // on one hardcoded ID, we try a short list of currently-active, Cloudflare-"pinned" models in
 // order — if one gets deprecated later, this just silently falls through to the next instead
 // of breaking Mode B outright. Update this list if the docs ever show all of them deprecated:
 // https://developers.cloudflare.com/workers-ai/models/ (filter: Text Generation)
-const MODEL_CANDIDATES = [
+const WORKERS_AI_MODEL_CANDIDATES = [
   "@cf/meta/llama-4-scout-17b-16e-instruct",
   "@cf/openai/gpt-oss-20b",
   "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 ];
 
-async function runWithFallback(env, messages, { jsonMode = true, maxTokens = 1200 } = {}) {
+const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+
+async function callWorkersAI(env, messages, { jsonMode = true, maxTokens = 1200 } = {}) {
   const attempts = [];
-  for (const model of MODEL_CANDIDATES) {
+  for (const model of WORKERS_AI_MODEL_CANDIDATES) {
     try {
       const result = await env.AI.run(model, {
         messages,
         ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         max_tokens: maxTokens,
       });
-      return { result, modelUsed: model };
+      const raw = result?.response ?? result;
+      const text = typeof raw === "string" ? raw : JSON.stringify(raw);
+      return { text, provider: "workers-ai", modelUsed: model };
     } catch (err) {
       attempts.push(`${model}: ${err?.message || err}`);
     }
   }
-  throw new Error(`All candidate models failed — ${attempts.join(" | ")}`);
+  throw new Error(`All Workers AI candidate models failed — ${attempts.join(" | ")}`);
 }
+
+async function callClaude(env, messages, { maxTokens = 1200 } = {}) {
+  // Claude's Messages API takes the system prompt as a separate top-level field,
+  // not as a role:"system" entry inside messages — split it out here so every
+  // handler can keep writing messages in the same OpenAI-style shape either way.
+  let systemPrompt = "";
+  let rest = messages;
+  if (messages[0]?.role === "system") {
+    systemPrompt = messages[0].content;
+    rest = messages.slice(1);
+  }
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: rest,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Claude API error (${res.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text = (data?.content || []).find((c) => c.type === "text")?.text || "";
+  if (!text) throw new Error("Claude returned an empty response.");
+
+  return { text, provider: "claude", modelUsed: CLAUDE_MODEL };
+}
+
+// The single entry point every handler uses. Swapping providers is a config change,
+// not a code change — see the file header.
+async function callModel(env, messages, opts = {}) {
+  if (env.ANTHROPIC_API_KEY) {
+    return callClaude(env, messages, opts);
+  }
+  return callWorkersAI(env, messages, opts);
+}
+
+function parseModelJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Model did not return valid JSON.");
+  }
+}
+
+// ---------- /api/plan ----------
 
 async function handlePlan(request, env) {
   let body;
@@ -97,39 +165,31 @@ async function handlePlan(request, env) {
     return Response.json({ error: "Missing description." }, { status: 400 });
   }
 
-  if (!env.AI) {
+  if (!env.AI && !env.ANTHROPIC_API_KEY) {
     return Response.json(
-      { error: "Workers AI isn't connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
+      { error: "No model provider connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
       { status: 500 }
     );
   }
 
   try {
-    const { result: aiResponse } = await runWithFallback(env, [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Client's request:\n\n${description}` },
-    ]);
+    const { text } = await callModel(
+      env,
+      [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Client's request:\n\n${description}` },
+      ],
+      { jsonMode: true, maxTokens: 1200 }
+    );
 
-    const raw = aiResponse?.response ?? aiResponse;
-    const text = typeof raw === "string" ? raw : JSON.stringify(raw);
-
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        parsed = JSON.parse(match[0]);
-      } else {
-        throw new Error("Model did not return valid JSON.");
-      }
-    }
-
+    const parsed = parseModelJSON(text);
     return Response.json(parsed);
   } catch (err) {
     return Response.json({ error: "The planning model couldn't produce a result. Try rephrasing or try again in a moment." }, { status: 502 });
   }
 }
+
+// ---------- /api/document ----------
 
 // Straight from the guide's own copy-paste prompt template (Part 5.5), adapted for direct AI use
 // rather than a human pasting it manually.
@@ -154,15 +214,15 @@ async function handleDocument(request, env) {
     return Response.json({ error: "Missing plan." }, { status: 400 });
   }
 
-  if (!env.AI) {
+  if (!env.AI && !env.ANTHROPIC_API_KEY) {
     return Response.json(
-      { error: "Workers AI isn't connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
+      { error: "No model provider connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
       { status: 500 }
     );
   }
 
   try {
-    const { result: aiResponse } = await runWithFallback(
+    const { text } = await callModel(
       env,
       [
         { role: "system", content: DOCUMENT_SYSTEM_PROMPT },
@@ -171,14 +231,14 @@ async function handleDocument(request, env) {
       { jsonMode: false, maxTokens: 500 }
     );
 
-    const text = (aiResponse?.response ?? aiResponse ?? "").toString().trim();
-    if (!text) throw new Error("Model returned an empty response.");
-
-    return Response.json({ documentation: text });
+    if (!text.trim()) throw new Error("Model returned an empty response.");
+    return Response.json({ documentation: text.trim() });
   } catch (err) {
     return Response.json({ error: "Couldn't generate documentation. Try again in a moment." }, { status: 502 });
   }
 }
+
+// ---------- /api/debug ----------
 
 const DEBUG_SYSTEM_PROMPT = `You are a debugging assistant helping a freelancer fix a broken step in a Make.com or n8n automation. They've described what the step is supposed to do and pasted the actual error message or symptom.
 
@@ -207,9 +267,9 @@ async function handleDebugChat(request, env) {
     return Response.json({ error: "Missing conversation." }, { status: 400 });
   }
 
-  if (!env.AI) {
+  if (!env.AI && !env.ANTHROPIC_API_KEY) {
     return Response.json(
-      { error: "Workers AI isn't connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
+      { error: "No model provider connected. Check the 'ai' binding in wrangler.jsonc and redeploy." },
       { status: 500 }
     );
   }
@@ -220,22 +280,8 @@ async function handleDebugChat(request, env) {
       messages.push({ role: "user", content: "Please give the direct diagnosis and fix now — skip any further guiding questions." });
     }
 
-    const { result: aiResponse } = await runWithFallback(env, messages, { jsonMode: true, maxTokens: 500 });
-
-    const raw = aiResponse?.response ?? aiResponse;
-    const text = typeof raw === "string" ? raw : JSON.stringify(raw);
-
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        parsed = JSON.parse(match[0]);
-      } else {
-        throw new Error("Model did not return valid JSON.");
-      }
-    }
+    const { text } = await callModel(env, messages, { jsonMode: true, maxTokens: 500 });
+    const parsed = parseModelJSON(text);
 
     const type = parsed?.type === "diagnosis" ? "diagnosis" : "question";
     const message =
