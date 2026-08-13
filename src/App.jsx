@@ -50,7 +50,8 @@ const LESSONS = [
   { id: 7, title: "Build & Test Discipline", subtitle: "The actual craft" },
   { id: 8, title: "Error Handling", subtitle: "Fallbacks & duplicate risk" },
   { id: 9, title: "Documentation", subtitle: "Delivering to a real client" },
-  { id: 10, title: "Certification", subtitle: "The milestone check", isCert: true },
+  { id: 10, title: "n8n Practice Track", subtitle: "Build it for real, get it checked" },
+  { id: 11, title: "Certification", subtitle: "The milestone check", isCert: true },
 ];
 
 const GLOSSARY = [
@@ -1850,7 +1851,7 @@ function Lesson1({ savedScore, onQuizComplete }) {
       <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
         What you're actually selling
       </h1>
-      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~6 min read</div>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>~9 min read</div>
 
       <div
         style={{
@@ -1911,6 +1912,59 @@ function Lesson1({ savedScore, onQuizComplete }) {
           You are not "a developer." You are a translator between a business owner's repetitive manual task
           and a visual canvas of connected boxes that does it for them automatically. Nearly everything in
           this course is about that translation — not about becoming a programmer.
+        </p>
+      </div>
+
+      <h2 style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 19, color: T.ink, marginTop: 34, marginBottom: 12 }}>
+        "Doesn't AI just make this obsolete?"
+      </h2>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 20 }}>
+        Fair question, and worth answering honestly instead of waving it away. Make.com and n8n both now
+        offer AI-native building — describe what you want in plain English and the tool scaffolds a
+        workflow for you. So why would a client pay you instead of just typing into that box themselves?
+      </p>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 20 }}>
+        Because in practice, that AI-generated first draft is exactly that — a draft. People who've tested
+        these features seriously report the same pattern over and over: they handle simple, single-step
+        requests reasonably well, and get noticeably less reliable the moment a prompt involves real
+        conditional logic, specific field mappings, or anything beyond the obvious happy path. One reviewer
+        watched Make's own AI assistant insert a stray, unexplained step into a conditional branch for no
+        reason. That's not a knock on the tool — it's just the honest ceiling of a single-shot AI build:
+        a useful jumping-off point, not a finished, correct, production-ready workflow.
+      </p>
+      <p style={{ fontFamily: FONTS.body, fontSize: 16.5, color: T.ink, lineHeight: 1.75, marginBottom: 20 }}>
+        Which is exactly where you come in. Nobody was ever paying a freelancer to click "add module" a
+        dozen times — that was never the valuable part. They were paying for someone to correctly translate
+        their messy, half-explained process into something that actually works, catch the edge case they
+        forgot to mention, and be reachable when it breaks in week three. A world where clients can
+        self-generate a plausible-looking but subtly wrong automation doesn't shrink that value — it raises
+        it. Being able to look at an AI-drafted workflow and tell whether it's actually correct is a
+        different, harder skill than building from scratch, and it's the one this entire course is built
+        around.
+      </p>
+      <div
+        style={{
+          background: T.parchmentDim,
+          borderRadius: 8,
+          padding: "18px 20px",
+          margin: "8px 0 28px 0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <BookOpen size={16} color={T.copper} />
+          <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: 0.6, color: T.copper, textTransform: "uppercase" }}>
+            Where to be honest with yourself
+          </span>
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 16, color: T.ink, margin: 0, lineHeight: 1.65 }}>
+          The simplest end of the five patterns — a bare lead-capture-and-notify with no conditions, no edge
+          cases, no volume concerns — is the segment most likely to get fully self-served over time as these
+          tools mature. That was always going to be the cheapest, most commoditized tier anyway. The
+          complexity that survives — conditional logic tuned to a specific business's real judgment calls,
+          error handling matched to their actual failure modes, multi-step chains that need real testing
+          discipline — is also where the pricing already concentrates. Build/test discipline, error
+          handling, and documentation aren't filler lessons here; they're the part of this course that
+          doesn't go stale.
         </p>
       </div>
 
@@ -3109,9 +3163,15 @@ function ModeALearn() {
           />
         )}
         {activeLesson === 10 && (
-          <CertificationTest
+          <Lesson10
             savedScore={completed[10]}
             onQuizComplete={(score) => setCompleted((c) => ({ ...c, 10: score }))}
+          />
+        )}
+        {activeLesson === 11 && (
+          <CertificationTest
+            savedScore={completed[11]}
+            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 11: score }))}
           />
         )}
       </div>
@@ -3239,6 +3299,298 @@ function downloadJSON(obj, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ---------- n8n Practice Track (Lesson 10) ----------
+// The trainee builds each scenario for real in their own n8n instance, exports the
+// workflow as JSON (n8n's built-in "Download"/"Copy to clipboard" feature), and pastes
+// it here. We check the *structure* — right trigger category, enough action nodes, a
+// branch where one's needed and both sides populated — not exact node names or
+// parameter values. This verifies real work in the real tool without us having to
+// build a fake n8n canvas.
+const N8N_TRACK_SCENARIOS = [
+  {
+    id: "t1",
+    level: "Easy",
+    title: "Instagram DM orders → spreadsheet",
+    scenario:
+      "A local bakery gets order requests through an Instagram DM automation tool that forwards each message to a webhook. Every new order request should be logged as a new row in a Google Sheet.",
+    expected: { minActions: 1, conditionRequired: false },
+  },
+  {
+    id: "t2",
+    level: "Easy",
+    title: "Booking → Trello card",
+    scenario:
+      "A freelance photographer wants every new booking request from her Calendly to automatically create a new card on her Trello board for tracking.",
+    expected: { minActions: 1, conditionRequired: false },
+  },
+  {
+    id: "t3",
+    level: "Medium",
+    title: "Gym sign-ups: log + welcome email",
+    scenario:
+      "A gym wants every new member sign-up from their sign-up form logged in a spreadsheet, and a welcome email sent to the new member.",
+    expected: { minActions: 2, conditionRequired: false },
+  },
+  {
+    id: "t4",
+    level: "Medium",
+    title: "High-value orders get a text",
+    scenario:
+      "An online store wants every new order over $200 to notify the owner directly via text message. Regular orders just get logged in a fulfillment spreadsheet.",
+    expected: { minActions: 0, conditionRequired: true, branchTrueMin: 1, branchFalseMin: 1 },
+  },
+  {
+    id: "t5",
+    level: "Hard",
+    title: "Emergency maintenance routing",
+    scenario:
+      "A property manager wants every new maintenance request logged in a tracker sheet first. Then: if it's tagged emergency, the on-call technician should get a text AND a task should be created in their project tool. If it's not an emergency, it just gets added to the weekly review queue.",
+    expected: { minActions: 1, conditionRequired: true, branchTrueMin: 2, branchFalseMin: 1 },
+  },
+  {
+    id: "t6",
+    level: "Hard",
+    title: "Churn analysis with AI categorization",
+    scenario:
+      "A subscription box company wants: every Monday, pull last month's churned customers from their CRM, then use AI to categorize the likely cancellation reason for each. If the reason is pricing, add them to a win-back email list. Otherwise, just log them in a churn report.",
+    expected: { minActions: 2, conditionRequired: true, branchTrueMin: 1, branchFalseMin: 1 },
+  },
+];
+
+function validateN8nExport(jsonText, expected) {
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return { ok: false, message: "That doesn't look like valid JSON — make sure you copied the full exported workflow, not part of it." };
+  }
+
+  const nodes = Array.isArray(parsed?.nodes) ? parsed.nodes : null;
+  if (!nodes) {
+    return { ok: false, message: "This doesn't look like an n8n workflow export — no \"nodes\" array found. In n8n: select all (Ctrl/Cmd+A), copy, and paste the whole thing." };
+  }
+
+  const real = nodes.filter((n) => n && typeof n.type === "string" && !/stickynote/i.test(n.type));
+  const isTrigger = (n) => /trigger|webhook|cron|schedule/i.test(n.type);
+  const isCondition = (n) => /\.(if|switch)$/i.test(n.type);
+
+  const triggers = real.filter(isTrigger);
+  const conditions = real.filter(isCondition);
+  const actions = real.filter((n) => !isTrigger(n) && !isCondition(n));
+
+  if (triggers.length === 0) {
+    return { ok: false, message: "No trigger node found — every workflow needs to start with one." };
+  }
+  if (actions.length < expected.minActions) {
+    return {
+      ok: false,
+      message: `Found ${actions.length} action node(s) — this scenario needs at least ${expected.minActions}. Reread the scenario for every downstream step.`,
+    };
+  }
+  if (expected.conditionRequired && conditions.length === 0) {
+    return { ok: false, message: "This scenario branches based on a condition — add an IF (or Switch) node." };
+  }
+  if (!expected.conditionRequired && conditions.length > 0) {
+    return { ok: false, message: "This scenario doesn't actually need a conditional branch — everything happens the same way every time." };
+  }
+
+  if (expected.conditionRequired && conditions.length > 0) {
+    const ifNode = conditions[0];
+    const conn = parsed?.connections?.[ifNode.name];
+    const trueCount = conn?.main?.[0]?.length || 0;
+    const falseCount = conn?.main?.[1]?.length || 0;
+    if (trueCount < (expected.branchTrueMin || 1)) {
+      return { ok: false, message: "The IF node's first (true) output doesn't connect to enough downstream steps for this scenario." };
+    }
+    if (falseCount < (expected.branchFalseMin || 1)) {
+      return { ok: false, message: "The IF node's second (false) output doesn't connect to enough downstream steps for this scenario." };
+    }
+  }
+
+  return {
+    ok: true,
+    message: "Structurally, this matches what the scenario needs. (This checks shape only — field mappings, credentials, and whether it actually runs correctly in n8n are still on you to verify.)",
+  };
+}
+
+function N8nTrackExercise({ exercise, solved, onSolved }) {
+  const [jsonText, setJsonText] = useState("");
+  const [feedback, setFeedback] = useState(null);
+
+  const check = () => {
+    const result = validateN8nExport(jsonText, exercise.expected);
+    setFeedback(result);
+    if (result.ok) onSolved();
+  };
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${T.parchmentDim}`, borderRadius: 10, padding: "22px 24px", marginBottom: 18, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+        <div style={{ fontFamily: FONTS.display, fontWeight: 600, fontSize: 15.5, color: T.ink }}>{exercise.title}</div>
+        {solved && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, color: T.signal, flexShrink: 0 }}>
+            <CheckCircle2 size={16} />
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11 }}>Verified</span>
+          </div>
+        )}
+      </div>
+      <p style={{ fontFamily: FONTS.body, fontSize: 14.5, color: T.ink, lineHeight: 1.6, margin: "0 0 16px 0" }}>{exercise.scenario}</p>
+
+      <label style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: T.inkSoft, textTransform: "uppercase", letterSpacing: 0.4 }}>
+        Paste your exported n8n workflow JSON
+      </label>
+      <textarea
+        value={jsonText}
+        onChange={(e) => setJsonText(e.target.value)}
+        placeholder="Build this in your own n8n instance, then select all → copy → paste the exported JSON here"
+        rows={4}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          fontFamily: FONTS.mono,
+          fontSize: 12.5,
+          color: T.ink,
+          padding: "10px 12px",
+          borderRadius: 7,
+          border: `1px solid ${T.parchmentDim}`,
+          background: T.parchment,
+          marginTop: 8,
+          marginBottom: 14,
+          resize: "vertical",
+        }}
+      />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <button
+          disabled={!jsonText.trim()}
+          onClick={check}
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            padding: "9px 18px",
+            borderRadius: 7,
+            border: "none",
+            background: jsonText.trim() ? T.copper : "#D8D2BE",
+            color: "#fff",
+            cursor: jsonText.trim() ? "pointer" : "not-allowed",
+          }}
+        >
+          Check my workflow
+        </button>
+        {feedback && (
+          <div style={{ fontFamily: FONTS.body, fontSize: 13.5, color: feedback.ok ? T.signal : "#B5523F", flex: "1 1 260px", minWidth: 0 }}>
+            {feedback.ok ? "✓ " : ""}
+            {feedback.message}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Lesson10({ savedScore, onQuizComplete }) {
+  const [solvedIds, setSolvedIds] = useState(() => new Set());
+  const reported = React.useRef(false);
+
+  const markSolved = (id) => {
+    setSolvedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (solvedIds.size === N8N_TRACK_SCENARIOS.length && !reported.current) {
+      reported.current = true;
+      onQuizComplete(solvedIds.size);
+    }
+  }, [solvedIds]);
+
+  const doneCount = savedScore !== undefined ? N8N_TRACK_SCENARIOS.length : solvedIds.size;
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: 1, color: T.copper, marginBottom: 10 }}>
+        LESSON 10 — N8N PRACTICE TRACK
+      </div>
+      <h1 style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 32, color: T.ink, margin: "0 0 6px 0", lineHeight: 1.15 }}>
+        Build it for real, get it checked
+      </h1>
+      <div style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, marginBottom: 30 }}>
+        {doneCount} / {N8N_TRACK_SCENARIOS.length} verified
+      </div>
+
+      <div
+        style={{
+          background: "rgba(76,139,245,0.08)",
+          borderLeft: `3px solid ${T.wire}`,
+          borderRadius: "0 8px 8px 0",
+          padding: "14px 18px",
+          marginBottom: 24,
+        }}
+      >
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.6, color: T.wire, marginBottom: 6, textTransform: "uppercase" }}>
+          Why n8n, and why for real
+        </div>
+        <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.ink, margin: 0, lineHeight: 1.6 }}>
+          Make.com gets you started with zero setup — but n8n is where the ceiling is higher long-term:
+          self-hosting, custom code, and clients who specifically need it. This track has you build each
+          scenario for real in your own n8n instance (self-hosted or n8n cloud), export the workflow, and get
+          it checked here — not a simulation.
+        </p>
+      </div>
+
+      <p style={{ fontFamily: FONTS.body, fontSize: 15, color: T.inkSoft, lineHeight: 1.7, marginBottom: 8 }}>
+        In n8n: build the workflow, then select all nodes (Ctrl/Cmd+A) and copy — this puts the workflow JSON
+        on your clipboard. Paste it into each scenario below to check it.
+      </p>
+      <p style={{ fontFamily: FONTS.body, fontSize: 13.5, color: T.inkSoft, lineHeight: 1.6, marginBottom: 28, fontStyle: "italic" }}>
+        Note: this checks structure — the right trigger, enough steps, branching where needed — not your
+        exact field mappings or whether it actually runs without error. That verification still happens in
+        n8n itself, same as any real job.
+      </p>
+
+      {N8N_TRACK_SCENARIOS.map((ex, i) => (
+        <div key={ex.id} style={{ marginBottom: 4 }}>
+          {(i === 2 || i === 4) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "8px 0 22px 0" }}>
+              <div style={{ flex: 1, height: 1, background: T.parchmentDim }} />
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 0.8, color: T.copper, textTransform: "uppercase" }}>
+                {i === 2 ? "Medium" : "Hard"}
+              </div>
+              <div style={{ flex: 1, height: 1, background: T.parchmentDim }} />
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: T.inkSoft, letterSpacing: 0.4 }}>
+              SCENARIO {i + 1} OF {N8N_TRACK_SCENARIOS.length}
+            </span>
+            <span
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 10,
+                letterSpacing: 0.4,
+                color: ex.level === "Hard" ? "#B5523F" : ex.level === "Medium" ? T.copper : T.signal,
+                background: ex.level === "Hard" ? "rgba(209,85,74,0.08)" : ex.level === "Medium" ? "rgba(201,124,61,0.1)" : "rgba(76,175,109,0.08)",
+                padding: "2px 8px",
+                borderRadius: 10,
+                textTransform: "uppercase",
+              }}
+            >
+              {ex.level}
+            </span>
+          </div>
+          <N8nTrackExercise exercise={ex} solved={savedScore !== undefined || solvedIds.has(ex.id)} onSolved={() => markSolved(ex.id)} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ---------- Mode B: Plan a real client job ----------
