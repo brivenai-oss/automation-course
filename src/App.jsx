@@ -39,6 +39,33 @@ function saveProgress(data) {
   }
 }
 
+const MAX_UNLOCKED_KEY = "automation-course-maxunlocked-v1";
+
+function loadMaxUnlocked(completedData) {
+  try {
+    const raw = window.localStorage.getItem(MAX_UNLOCKED_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fall through to derive from completed history below
+  }
+  // First run after this feature shipped — derive from existing completed progress
+  // so nobody's already-unlocked lessons appear locked.
+  let max = 1;
+  for (let id = 1; id <= 11; id++) {
+    if (completedData[id] !== undefined) max = id + 1;
+    else break;
+  }
+  return max;
+}
+
+function saveMaxUnlocked(value) {
+  try {
+    window.localStorage.setItem(MAX_UNLOCKED_KEY, JSON.stringify(value));
+  } catch {
+    // storage unavailable — fail silently
+  }
+}
+
 // ---------- Content ----------
 const LESSONS = [
   { id: 1, title: "Positioning", subtitle: "What you're actually selling" },
@@ -2990,11 +3017,15 @@ function ModeALearn() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeLesson, setActiveLesson] = useState(1);
   const [completed, setCompleted] = useState({});
+  const [maxUnlocked, setMaxUnlocked] = useState(1);
   const [loaded, setLoaded] = useState(false);
+  const [resetKeys, setResetKeys] = useState({});
 
   // Load saved progress once on mount
   useEffect(() => {
-    setCompleted(loadProgress());
+    const c = loadProgress();
+    setCompleted(c);
+    setMaxUnlocked(loadMaxUnlocked(c));
     setLoaded(true);
   }, []);
 
@@ -3003,7 +3034,28 @@ function ModeALearn() {
     if (loaded) saveProgress(completed);
   }, [completed, loaded]);
 
-  const isUnlocked = (l) => l.id === 1 || completed[l.id - 1] !== undefined;
+  useEffect(() => {
+    if (loaded) saveMaxUnlocked(maxUnlocked);
+  }, [maxUnlocked, loaded]);
+
+  // Unlock state is tracked separately from current completion, so resetting an
+  // earlier lesson never re-locks lessons already reached — it only clears that
+  // lesson's own score so it shows as "todo" again and can be redone.
+  const isUnlocked = (l) => l.id === 1 || l.id <= maxUnlocked;
+
+  const completeLesson = (id, score) => {
+    setCompleted((c) => ({ ...c, [id]: score }));
+    setMaxUnlocked((m) => Math.max(m, id + 1));
+  };
+
+  const resetLesson = (id) => {
+    setCompleted((c) => {
+      const next = { ...c };
+      delete next[id];
+      return next;
+    });
+    setResetKeys((k) => ({ ...k, [id]: (k[id] || 0) + 1 }));
+  };
 
   const lessonState = (l) => {
     if (completed[l.id] !== undefined) return "done";
@@ -3108,70 +3160,102 @@ function ModeALearn() {
 
       {/* Main content */}
       <div style={{ flex: 1, minWidth: 0, background: T.parchment, padding: "48px 56px", overflowY: "auto", overflowX: "hidden" }}>
+        {completed[activeLesson] !== undefined && (
+          <div className="no-print" style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+            <button
+              onClick={() => resetLesson(activeLesson)}
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 11,
+                letterSpacing: 0.4,
+                textTransform: "uppercase",
+                padding: "7px 14px",
+                borderRadius: 6,
+                border: `1px solid ${T.parchmentDim}`,
+                background: "transparent",
+                color: T.inkSoft,
+                cursor: "pointer",
+              }}
+            >
+              Reset this lesson
+            </button>
+          </div>
+        )}
         {activeLesson === 1 && (
           <Lesson1
+            key={`lesson-1-${resetKeys[1] || 0}`}
             savedScore={completed[1]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 1: score }))}
+            onQuizComplete={(score) => completeLesson(1, score)}
           />
         )}
         {activeLesson === 2 && (
           <Lesson2
+            key={`lesson-2-${resetKeys[2] || 0}`}
             savedScore={completed[2]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 2: score }))}
+            onQuizComplete={(score) => completeLesson(2, score)}
           />
         )}
         {activeLesson === 3 && (
           <Lesson3
+            key={`lesson-3-${resetKeys[3] || 0}`}
             savedScore={completed[3]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 3: score }))}
+            onQuizComplete={(score) => completeLesson(3, score)}
           />
         )}
         {activeLesson === 4 && (
           <Lesson4
+            key={`lesson-4-${resetKeys[4] || 0}`}
             savedScore={completed[4]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 4: score }))}
+            onQuizComplete={(score) => completeLesson(4, score)}
           />
         )}
         {activeLesson === 5 && (
           <Lesson5
+            key={`lesson-5-${resetKeys[5] || 0}`}
             savedScore={completed[5]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 5: score }))}
+            onQuizComplete={(score) => completeLesson(5, score)}
           />
         )}
         {activeLesson === 6 && (
           <Lesson6
+            key={`lesson-6-${resetKeys[6] || 0}`}
             savedScore={completed[6]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 6: score }))}
+            onQuizComplete={(score) => completeLesson(6, score)}
           />
         )}
         {activeLesson === 7 && (
           <Lesson7
+            key={`lesson-7-${resetKeys[7] || 0}`}
             savedScore={completed[7]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 7: score }))}
+            onQuizComplete={(score) => completeLesson(7, score)}
           />
         )}
         {activeLesson === 8 && (
           <Lesson8
+            key={`lesson-8-${resetKeys[8] || 0}`}
             savedScore={completed[8]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 8: score }))}
+            onQuizComplete={(score) => completeLesson(8, score)}
           />
         )}
         {activeLesson === 9 && (
           <Lesson9
+            key={`lesson-9-${resetKeys[9] || 0}`}
             savedScore={completed[9]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 9: score }))}
+            onQuizComplete={(score) => completeLesson(9, score)}
           />
         )}
         {activeLesson === 10 && (
           <Lesson10
+            key={`lesson-10-${resetKeys[10] || 0}`}
             savedScore={completed[10]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 10: score }))}
+            onQuizComplete={(score) => completeLesson(10, score)}
           />
         )}
         {activeLesson === 11 && (
           <CertificationTest
+            key={`lesson-11-${resetKeys[11] || 0}`}
             savedScore={completed[11]}
-            onQuizComplete={(score) => setCompleted((c) => ({ ...c, 11: score }))}
+            onQuizComplete={(score) => completeLesson(11, score)}
           />
         )}
       </div>
