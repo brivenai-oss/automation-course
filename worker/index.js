@@ -74,7 +74,7 @@ const WORKERS_AI_MODEL_CANDIDATES = [
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 
-async function callWorkersAI(env, messages, { jsonMode = true, maxTokens = 1200 } = {}) {
+export async function callWorkersAI(env, messages, { jsonMode = true, maxTokens = 1200 } = {}) {
   const attempts = [];
   for (const model of WORKERS_AI_MODEL_CANDIDATES) {
     try {
@@ -93,7 +93,7 @@ async function callWorkersAI(env, messages, { jsonMode = true, maxTokens = 1200 
   throw new Error(`All Workers AI candidate models failed — ${attempts.join(" | ")}`);
 }
 
-async function callClaude(env, messages, { maxTokens = 1200 } = {}) {
+export async function callClaude(env, messages, { maxTokens = 1200 } = {}) {
   // Claude's Messages API takes the system prompt as a separate top-level field,
   // not as a role:"system" entry inside messages — split it out here so every
   // handler can keep writing messages in the same OpenAI-style shape either way.
@@ -133,14 +133,14 @@ async function callClaude(env, messages, { maxTokens = 1200 } = {}) {
 
 // The single entry point every handler uses. Swapping providers is a config change,
 // not a code change — see the file header.
-async function callModel(env, messages, opts = {}) {
+export async function callModel(env, messages, opts = {}) {
   if (env.ANTHROPIC_API_KEY) {
     return callClaude(env, messages, opts);
   }
   return callWorkersAI(env, messages, opts);
 }
 
-function parseModelJSON(text) {
+export function parseModelJSON(text) {
   try {
     return JSON.parse(text);
   } catch {
@@ -152,7 +152,7 @@ function parseModelJSON(text) {
 
 // ---------- /api/plan ----------
 
-async function handlePlan(request, env) {
+export async function handlePlan(request, env) {
   let body;
   try {
     body = await request.json();
@@ -201,7 +201,7 @@ Do not use technical jargon: no "webhook", "API", "node", "JSON", "trigger" (say
 
 Return ONLY the explanation text itself — no headers, no markdown formatting, no preamble like "Here's the documentation:", just the plain-language paragraphs a client would actually receive.`;
 
-async function handleDocument(request, env) {
+export async function handleDocument(request, env) {
   let body;
   try {
     body = await request.json();
@@ -252,7 +252,7 @@ Write conversationally, like you're actually talking to someone — a few senten
 
 Respond with ONLY a JSON object: {"type": "question", "message": "..."} when asking a guiding question, or {"type": "diagnosis", "message": "..."} when giving the actual answer.`;
 
-async function handleDebugChat(request, env) {
+export async function handleDebugChat(request, env) {
   let body;
   try {
     body = await request.json();
